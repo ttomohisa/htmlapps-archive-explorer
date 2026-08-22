@@ -1,0 +1,20 @@
+{
+  "$schema": "./schemas/dependencies.schema.json",
+  "dependencies": [
+    {
+      "id": "lzma-js",
+      "package": "lzma",
+      "version": "2.3.2",
+      "license": "MIT",
+      "homepage": "https://github.com/LZMA-JS/LZMA-JS",
+      "assets": [
+        {
+          "key": "lzma-decompressor",
+          "path": "src/vendor/lzma-d-min.js",
+          "mime": "text/javascript",
+          "compression": "none"
+        }
+      ]
+    }
+  ]
+}

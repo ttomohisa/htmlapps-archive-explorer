@@ -1,0 +1,14 @@
+{
+    "generatedAt":  "2026-08-23T03:13:56.6950826+09:00",
+    "readable":  {
+                     "path":  "dist/index.html",
+                     "bytes":  150906,
+                     "mb":  0.144
+                 },
+    "selfExtract":  {
+                        "path":  "dist/index.self-extract.html",
+                        "bytes":  56434,
+                        "mb":  0.054
+                    },
+    "gzipPayloadBytes":  41670
+}

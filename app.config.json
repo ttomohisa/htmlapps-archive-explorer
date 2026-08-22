@@ -1,0 +1,26 @@
+{
+  "$schema": "./schemas/app-config.schema.json",
+  "name": "Archive Explorer",
+  "nameJa": "Archive Explorer",
+  "slug": "archive-explorer",
+  "version": "1.0.0",
+  "description": "Inspect ZIP, 7z, RAR5, TAR, GZIP, CAB, ISO and LZH archives locally before extracting files.",
+  "descriptionJa": "ZIP / 7z / RAR5 / TAR / GZIP / CAB / ISO / LZH の中身を展開前にブラウザ内だけで確認・分析できるツールです。",
+  "defaultLanguage": "auto",
+  "repository": {
+    "owner": "ttomohisa",
+    "name": "htmlapps-archive-explorer"
+  },
+  "build": {
+    "output": "dist/index.html",
+    "blockRuntimeNetwork": true,
+    "selfExtract": {
+      "enabled": true,
+      "output": "dist/index.self-extract.html"
+    },
+    "sizeBudget": {
+      "readableWarningMb": 3,
+      "selfExtractWarningMb": 1
+    }
+  }
+}

@@ -1,0 +1,796 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#f5f5f2">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:; script-src 'self' 'unsafe-inline' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data: blob:; media-src 'self' data: blob:; worker-src 'self' blob:; connect-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Archive Explorer</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%2316624f'/%3E%3Cpath d='M16 22h32v28H16zM21 15h22v7H21z' fill='none' stroke='white' stroke-width='4' stroke-linejoin='round'/%3E%3Cpath d='M32 26v18M28 30h8M28 36h8' stroke='white' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+  <style>
+    :root{
+      color-scheme:light;--bg:#f5f5f2;--surface:#fff;--surface-muted:#f0f0ed;--surface-hover:#e9e9e5;
+      --text:#20211f;--muted:#666963;--line:#dadbd6;--line-strong:#bfc1ba;--accent:#16624f;
+      --accent-hover:#0e503f;--accent-soft:#e1f0ea;--danger:#b3261e;--danger-soft:#fff1ef;
+      --warning:#8a5a00;--warning-soft:#fff7dc;--focus:#4d8bc7;--shadow-sm:0 1px 2px rgba(25,28,24,.08),0 1px 6px rgba(25,28,24,.04);
+      --shadow-md:0 12px 34px rgba(25,28,24,.10);--radius:12px;--header-height:66px;--folder-width:228px;--inspector-width:330px
+    }
+    *{box-sizing:border-box} html{min-height:100%;background:var(--bg);scroll-behavior:smooth}
+    body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP","Yu Gothic UI","Hiragino Kaku Gothic ProN",Meiryo,sans-serif;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+    button,input,select{font:inherit;color:inherit} button:focus-visible,input:focus-visible,select:focus-visible,[tabindex]:focus-visible{outline:3px solid color-mix(in srgb,var(--focus) 55%,transparent);outline-offset:2px}
+    button{cursor:pointer}.hidden{display:none!important}.app-header{position:sticky;z-index:40;top:0;min-height:var(--header-height);border-bottom:1px solid color-mix(in srgb,var(--line) 82%,transparent);background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(16px) saturate(1.2)}
+    .header-inner{width:min(1320px,100%);min-height:var(--header-height);margin:0 auto;padding:10px clamp(14px,2.8vw,30px);display:flex;align-items:center;gap:14px}
+    .brand{display:flex;align-items:center;gap:10px;min-width:0}.brand-mark{display:grid;place-items:center;width:38px;height:38px;flex:0 0 auto;border-radius:11px;background:var(--accent);color:#fff;box-shadow:var(--shadow-sm)}
+    .brand-mark svg{width:21px;height:21px}.brand-copy{min-width:0}.brand-name{margin:0;font-size:17px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.version-badge{display:inline-flex;margin-left:7px;padding:1px 6px;border:1px solid var(--line);border-radius:999px;color:var(--muted);background:var(--surface-muted);font-size:10px;vertical-align:2px}.brand-meta{margin:2px 0 0;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .header-actions{margin-left:auto;display:flex;align-items:center;gap:12px}.language-button,.header-icon-button{padding:5px 1px;border:0;background:transparent;color:var(--muted);font-weight:750}.language-button{font-size:12px}.header-icon-button{display:grid;place-items:center}.header-icon-button svg{width:20px;height:20px}.language-button:hover,.header-icon-button:hover{color:var(--text)}
+    main{width:min(1320px,100%);margin:0 auto;padding:22px clamp(14px,2.8vw,30px) 92px}.page-intro{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;padding:0 2px 18px}.page-intro h2{margin:0;font-size:clamp(21px,3vw,27px);line-height:1.3;letter-spacing:-.025em}.page-intro p{margin:5px 0 0;max-width:760px;color:var(--muted);font-size:13px}
+    .local-badge{display:inline-flex;align-items:center;gap:7px;flex:0 0 auto;margin-top:3px;padding:7px 10px;border:1px solid color-mix(in srgb,var(--accent) 24%,var(--line));border-radius:999px;color:var(--accent);background:var(--accent-soft);font-size:12px;font-weight:700;white-space:nowrap}.local-badge svg{width:15px;height:15px}
+    .card{border:1px solid var(--line);border-radius:16px;background:var(--surface);box-shadow:var(--shadow-sm)}.drop-card{padding:26px}.dropzone{min-height:250px;border:1.5px dashed var(--line-strong);border-radius:14px;background:#fbfbf9;display:grid;place-items:center;text-align:center;padding:28px;transition:.16s}.dropzone.drag{border-color:var(--accent);background:var(--accent-soft)}.drop-icon{width:54px;height:54px;margin:0 auto 14px;border-radius:16px;background:var(--surface-muted);display:grid;place-items:center;color:var(--accent)}.drop-icon svg{width:27px;height:27px}.dropzone h3{margin:0;font-size:18px}.dropzone p{margin:7px 0 16px;color:var(--muted);font-size:12px}.button{min-height:40px;padding:8px 14px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font-weight:700}.button:hover{border-color:var(--line-strong);background:var(--surface-hover)}.button.primary{border-color:var(--accent);background:var(--accent);color:#fff}.button.primary:hover{background:var(--accent-hover)}.button.ghost{border-color:transparent;background:transparent}.button.small{min-height:34px;padding:6px 10px;font-size:12px}.muted{color:var(--muted)}.formats{margin-top:14px;font-size:11px;color:var(--muted)}
+    .archive-head{padding:16px 18px;display:flex;align-items:flex-start;gap:14px;margin-bottom:12px}.archive-icon{width:42px;height:42px;flex:0 0 auto;border-radius:12px;background:var(--accent-soft);display:grid;place-items:center;color:var(--accent)}.archive-icon svg{width:21px;height:21px}.archive-copy{min-width:0;flex:1}.archive-name{font-size:16px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.archive-meta{margin-top:3px;color:var(--muted);font-size:12px}.archive-capability{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:7px;font-size:10px}.cap-pill{display:inline-flex;align-items:center;min-height:23px;padding:2px 8px;border:1px solid var(--line);border-radius:999px;background:var(--surface-muted);font-weight:800}.cap-pill.ok{border-color:color-mix(in srgb,var(--accent) 28%,var(--line));background:var(--accent-soft);color:var(--accent)}.cap-pill.partial{border-color:#ecd9a8;background:var(--warning-soft);color:var(--warning)}.cap-pill.blocked{border-color:#efc6c1;background:var(--danger-soft);color:var(--danger)}.cap-detail{color:var(--muted)}.archive-phase{display:flex;align-items:center;gap:8px;margin-top:7px;min-height:18px;color:var(--muted);font-size:10px}.phase-track{width:min(180px,32vw);height:5px;border-radius:999px;background:var(--surface-muted);overflow:hidden}.phase-fill{height:100%;width:0;background:var(--accent);border-radius:inherit;transition:width .15s ease}.archive-actions{margin-left:auto;display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}
+    .stats-strip{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin:0 0 12px}.stat{padding:11px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}.stat-label{display:block;color:var(--muted);font-size:10px}.stat-value{display:block;margin-top:2px;font-size:15px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .view-tabs{display:flex;gap:6px;margin:0 0 12px;padding:4px;border:1px solid var(--line);border-radius:12px;background:var(--surface);width:max-content;max-width:100%;overflow:auto}.tab-btn{min-height:34px;padding:6px 11px;border:0;border-radius:8px;background:transparent;font-size:12px;font-weight:750;color:var(--muted);white-space:nowrap}.tab-btn.active{background:var(--accent-soft);color:var(--accent)}
+    .explorer{display:grid;grid-template-columns:var(--folder-width) 5px minmax(380px,1fr) 5px var(--inspector-width);min-height:610px;overflow:hidden}.pane{min-width:0;overflow:hidden}.pane-head{height:52px;padding:10px 12px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px}.pane-title{font-size:12px;font-weight:800}.pane-head-actions{margin-left:auto;display:flex;gap:3px}.pane-toggle{width:28px;height:28px;padding:0;border:0;border-radius:7px;background:transparent;color:var(--muted);display:grid;place-items:center}.pane-toggle:hover{background:var(--surface-hover);color:var(--text)}.pane-toggle svg{width:15px;height:15px}.pane-resizer{position:relative;z-index:2;background:var(--line);cursor:col-resize;touch-action:none}.pane-resizer:before{content:"";position:absolute;inset:0 -3px}.pane-resizer:hover,.pane-resizer.dragging{background:var(--accent)}.explorer.folder-collapsed{grid-template-columns:0 0 minmax(380px,1fr) 5px var(--inspector-width)}.explorer.folder-collapsed .folders-pane,.explorer.folder-collapsed #leftResizer{display:none}.explorer.inspector-collapsed{grid-template-columns:var(--folder-width) 5px minmax(380px,1fr) 0 0}.explorer.inspector-collapsed .inspector-pane,.explorer.inspector-collapsed #rightResizer{display:none}.folders-pane{grid-column:1}.files-pane{grid-column:3;border-left:1px solid var(--line);border-right:1px solid var(--line)}.inspector-pane{grid-column:5}#leftResizer{grid-column:2}#rightResizer{grid-column:4}.folder-tree{padding:6px 6px 10px;max-height:620px;overflow:auto}.folder-row{display:flex;align-items:center;min-width:0}.folder-btn{width:100%;min-height:31px;padding:3px 7px 3px 4px;border:0;border-radius:7px;background:transparent;display:flex;align-items:center;gap:5px;text-align:left;color:var(--text)}.folder-btn:hover{background:var(--surface-hover)}.folder-btn.active{background:var(--accent-soft);color:var(--accent)}.folder-btn>svg,.folder-icon,.file-icon{width:17px;height:17px;flex:0 0 auto}.folder-chevron{width:18px;height:25px;padding:0;border:0;border-radius:5px;background:transparent;display:grid;place-items:center;flex:0 0 auto;color:var(--muted)}.folder-chevron:hover{background:color-mix(in srgb,var(--line) 55%,transparent);color:var(--text)}.folder-chevron svg{width:11px;height:11px;transition:transform .14s ease}.folder-chevron.open svg{transform:rotate(90deg)}.folder-chevron.placeholder{pointer-events:none;visibility:hidden}.folder-label{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:650}.folder-count{min-width:22px;margin-left:4px;padding:1px 6px;border-radius:999px;background:var(--surface-muted);color:var(--muted);font-size:9px;font-weight:700;text-align:center;line-height:17px}.folder-btn.active .folder-count{background:color-mix(in srgb,var(--accent) 10%,var(--surface));color:var(--accent)}
+    .searchbox{position:relative;flex:1;min-width:180px}.searchbox input{width:100%;min-height:34px;padding:7px 10px 7px 31px;border:1px solid var(--line);border-radius:9px;background:#fbfbf9}.searchbox svg{position:absolute;left:9px;top:9px;width:16px;height:16px;color:var(--muted)}.filter-select{min-height:34px;max-width:115px;border:1px solid var(--line);border-radius:9px;background:var(--surface);padding:5px 8px;font-size:11px}.filter-wrap{position:relative}.filter-btn{min-height:34px;padding:6px 9px;border:1px solid var(--line);border-radius:9px;background:var(--surface);display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700}.filter-btn.active{border-color:color-mix(in srgb,var(--accent) 45%,var(--line));background:var(--accent-soft);color:var(--accent)}.filter-popover{position:absolute;z-index:25;right:0;top:calc(100% + 7px);width:260px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--surface);box-shadow:var(--shadow-md)}.filter-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}.filter-field{display:grid;gap:4px}.filter-field label,.check-row{font-size:10px;color:var(--muted)}.filter-field input{width:100%;min-height:34px;border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:#fbfbf9}.filter-checks{display:grid;gap:7px;margin-top:10px}.check-row{display:flex;align-items:center;gap:7px;color:var(--text)}.filter-actions{display:flex;justify-content:flex-end;margin-top:11px}.breadcrumb{display:flex;align-items:center;gap:3px;padding:9px 12px;border-bottom:1px solid var(--line);font-size:11px;color:var(--muted);white-space:nowrap;overflow:auto}.crumb-sep{color:var(--line-strong);padding:0 1px}.archive-crumb{font-weight:750;color:var(--accent)!important}.breadcrumb button{border:0;background:transparent;padding:2px 3px;color:var(--muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.breadcrumb button:hover{color:var(--text)}
+    .selection-bar{min-height:42px;padding:6px 10px;border-bottom:1px solid var(--line);background:var(--accent-soft);display:flex;align-items:center;gap:8px}.selection-bar strong{font-size:11px}.selection-bar .selection-actions{margin-left:auto;display:flex;gap:6px}.file-columns{display:grid;grid-template-columns:28px minmax(0,1fr) 84px 68px;align-items:center;gap:7px;min-height:32px;padding:4px 10px;border-bottom:1px solid var(--line);background:#fafaf8;color:var(--muted);font-size:9px;font-weight:750;text-transform:uppercase;letter-spacing:.02em}.sort-btn{border:0;background:transparent;padding:2px 0;color:inherit;text-align:left;font-weight:inherit;font-size:inherit}.sort-btn.numeric{text-align:right}.sort-btn.active{color:var(--accent)}.file-list{max-height:534px;overflow:auto;position:relative}.file-list.virtualized{height:534px;contain:content}.virtual-space{position:relative;width:100%}.virtual-items{position:absolute;left:0;right:0;top:0;will-change:transform}.file-row{display:grid;grid-template-columns:28px minmax(0,1fr) 84px 68px;align-items:center;gap:7px;height:45px;min-height:45px;padding:6px 10px;border-bottom:1px solid color-mix(in srgb,var(--line) 72%,transparent)}.file-row:hover{background:#fafaf8}.file-row.active{background:var(--accent-soft)}.file-row.keyboard{box-shadow:inset 3px 0 var(--accent)}.file-row button.file-main{min-width:0;border:0;background:transparent;text-align:left;padding:0;display:flex;align-items:center;gap:8px}.file-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:650}.file-sub{display:none;color:var(--muted);font-size:10px}.size-cell,.ratio-cell{text-align:right;color:var(--muted);font-size:11px}.select-box{width:18px;height:18px}.select-box:disabled{cursor:not-allowed;opacity:.35}.entry-state{display:inline-flex;margin-left:6px;padding:1px 5px;border-radius:999px;background:var(--warning-soft);color:var(--warning);font-size:8px;font-weight:800;vertical-align:1px}.entry-state.locked{background:var(--danger-soft);color:var(--danger)}
+    .empty-list{padding:44px 18px;text-align:center;color:var(--muted)}
+    .inspector{max-height:620px;overflow:auto}.inspector-tabs{display:flex;gap:3px;padding:7px 10px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--surface);z-index:3}.inspector-tab{flex:1;min-height:30px;border:0;border-radius:7px;background:transparent;color:var(--muted);font-size:10px;font-weight:750}.inspector-tab.active{background:var(--accent-soft);color:var(--accent)}.inspector-empty{display:grid;place-items:center;min-height:560px;padding:24px;text-align:center;color:var(--muted)}.inspect-body{padding:14px}.inspect-title{font-size:14px;font-weight:800;overflow-wrap:anywhere}.inspect-path{margin-top:3px;color:var(--muted);font-size:10px;overflow-wrap:anywhere}.preview{margin:14px 0;border:1px solid var(--line);border-radius:12px;background:#fbfbf9;min-height:210px;display:grid;place-items:center;overflow:hidden}.preview img{max-width:100%;max-height:320px;display:block}.preview pre{width:100%;max-height:320px;margin:0;padding:12px;overflow:auto;white-space:pre-wrap;word-break:break-word;font:11px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace}.preview-message{padding:22px;text-align:center;color:var(--muted);font-size:12px}.hex-wrap{width:100%;min-width:0}.hex-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:8px 10px;border-bottom:1px solid var(--line);background:var(--surface-muted);font-size:9px;color:var(--muted)}.hex-meta strong{color:var(--text)}.hex-dump{width:100%;max-height:320px;margin:0!important;padding:10px!important;overflow:auto!important;white-space:pre!important;word-break:normal!important;font:10px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace!important}.button:disabled{cursor:not-allowed;opacity:.48;background:var(--surface-muted)!important;color:var(--muted)!important;border-color:var(--line)!important}.kv{display:grid;grid-template-columns:minmax(90px,.7fr) minmax(0,1fr);gap:7px 12px;padding:8px 0;border-bottom:1px solid var(--line)}.kv span:first-child{color:var(--muted);font-size:11px}.kv span:last-child{text-align:right;font-size:11px;overflow-wrap:anywhere}.inspect-actions{display:flex;gap:7px;margin-top:14px;flex-wrap:wrap}.file-note-list{display:grid;gap:8px;margin-top:12px}.file-note{padding:10px;border:1px solid #ecd9a8;border-radius:10px;background:var(--warning-soft);font-size:11px}.file-note.danger{border-color:#efc6c1;background:var(--danger-soft)}.nested-open{width:100%;margin-top:10px}.hint{color:var(--muted);font-size:10px}
+    .analysis{padding:18px}.analysis-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.analysis-card{padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}.analysis-card span{display:block;color:var(--muted);font-size:10px}.analysis-card strong{display:block;margin-top:3px;font-size:18px}.section-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}.analysis-section{padding:15px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}.analysis-section h3{margin:0 0 12px;font-size:13px}.bar-row{display:grid;grid-template-columns:minmax(80px,1fr) 2fr 70px;align-items:center;gap:8px;margin:8px 0;font-size:11px}.bar-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.bar-track{height:8px;background:var(--surface-muted);border-radius:999px;overflow:hidden}.bar-fill{height:100%;background:var(--accent);border-radius:inherit}.bar-value{text-align:right;color:var(--muted)}.map-head{display:flex;align-items:center;gap:7px;margin-bottom:10px}.map-head h3{margin:0}.map-breadcrumb{min-width:0;flex:1;color:var(--muted);font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.treemap{display:flex;min-height:220px;gap:3px;overflow:hidden;border-radius:10px;background:var(--surface-muted);padding:3px}.treeblock{min-width:44px;position:relative;border:1px solid color-mix(in srgb,var(--accent) 16%,var(--line));border-radius:7px;background:var(--accent-soft);overflow:hidden;padding:0;text-align:left}.treeblock:hover{border-color:var(--accent);background:color-mix(in srgb,var(--accent-soft) 70%,var(--surface))}.treeblock span{position:absolute;inset:7px;font-size:10px;font-weight:750;overflow:hidden}.treeblock small{display:block;color:var(--muted);font-weight:500}
+    .safety-layout{display:grid;grid-template-columns:1.2fr .8fr;gap:12px;padding:18px}.notice-list{display:grid;gap:8px}.notice{padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}.notice-paths{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}.path-chip{max-width:100%;padding:4px 7px;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--muted);font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.path-chip:hover{border-color:var(--accent);color:var(--accent)}.notice.warning{border-color:#ecd9a8;background:var(--warning-soft)}.notice.danger{border-color:#efc6c1;background:var(--danger-soft)}.notice-title{display:flex;gap:8px;align-items:flex-start;font-weight:800;font-size:12px}.notice-title svg{width:17px;height:17px;flex:0 0 auto}.notice p{margin:5px 0 0;color:var(--muted);font-size:11px;overflow-wrap:anywhere}.ok-card{padding:18px;text-align:center}.ok-card svg{width:36px;height:36px;color:var(--accent)}.dup-group{padding:10px 0;border-bottom:1px solid var(--line)}.dup-group:last-child{border-bottom:0}.dup-group strong{font-size:11px}.dup-group div{font-size:10px;color:var(--muted);overflow-wrap:anywhere}.dup-path{display:block;width:100%;padding:3px 0;border:0;background:transparent;text-align:left;color:var(--muted);font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dup-path:hover{color:var(--accent)}
+    dialog{width:min(520px,calc(100vw - 28px));border:1px solid var(--line);border-radius:16px;padding:0;background:var(--surface);box-shadow:var(--shadow-md)}dialog::backdrop{background:rgba(24,28,25,.28)}.dialog-head{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}.dialog-head h2{margin:0;font-size:16px}.dialog-head button{margin-left:auto}.dialog-body{padding:17px 18px}.dialog-body h3{font-size:12px;margin:16px 0 6px}.dialog-body p,.dialog-body li{font-size:12px;color:var(--muted)}.dialog-actions{padding:12px 18px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px}.field-label{display:block;margin-bottom:5px;color:var(--muted);font-size:11px;font-weight:700}.filename-control{display:grid;grid-template-columns:minmax(0,1fr) auto;border:1px solid var(--line);border-radius:10px;overflow:hidden}.filename-control input{min-height:40px;border:0;outline:0;padding:8px 10px}.filename-control span{display:grid;place-items:center;padding:0 10px;background:var(--surface-muted);color:var(--muted);font-size:11px}.password-field{position:relative}.password-field input{width:100%;min-height:44px;padding:9px 42px 9px 11px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font-size:16px}.password-toggle{position:absolute;right:5px;top:50%;transform:translateY(-50%);width:34px;height:34px;border:0;border-radius:8px;background:transparent;color:var(--muted);display:grid;place-items:center}.password-toggle:hover{background:var(--surface-hover);color:var(--text)}.password-toggle svg{width:17px;height:17px}.password-note{display:flex;gap:8px;align-items:flex-start;margin-top:10px;padding:10px;border-radius:10px;background:var(--accent-soft);color:var(--accent);font-size:11px}.password-note svg{width:16px;height:16px;flex:0 0 auto;margin-top:1px}.password-error{margin-top:9px;color:var(--danger);font-size:11px;font-weight:700}.password-target{margin:0 0 12px;padding:8px 10px;border-radius:9px;background:var(--surface-muted);font-size:11px;overflow-wrap:anywhere}
+    .toast{position:fixed;right:18px;bottom:calc(18px + env(safe-area-inset-bottom));z-index:80;max-width:min(420px,calc(100vw - 36px));padding:11px 13px;border:1px solid var(--line);border-radius:12px;background:var(--surface);box-shadow:var(--shadow-md);font-size:12px}
+    .mobile-bar{display:none}
+    footer{width:min(1320px,100%);margin:0 auto;padding:0 clamp(14px,2.8vw,30px) 34px;color:var(--muted);font-size:11px}
+    @media(max-width:980px){#collapseFolders,#collapseInspector,#showFolders,#showInspector{display:none!important}.explorer,.explorer.folder-collapsed,.explorer.inspector-collapsed{grid-template-columns:190px minmax(320px,1fr)}.pane-resizer{display:none}.folders-pane{grid-column:1}.files-pane{grid-column:2}.inspector-pane{grid-column:1/-1}.explorer.folder-collapsed .folders-pane{display:block}.explorer.inspector-collapsed .inspector-pane{display:block}.files-pane{border-right:0}.inspector-pane{grid-column:1/-1;border-left:0!important;border-top:1px solid var(--line)}.inspector{max-height:none}.inspector-empty{min-height:220px}.analysis-grid{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:720px){
+      :root{--header-height:60px}.brand-meta{display:none}.brand-mark{width:34px;height:34px}.header-inner{gap:10px}.page-intro{display:block}.local-badge{margin-top:11px}.drop-card{padding:14px}.dropzone{min-height:220px}.archive-head{padding:12px}.archive-icon{display:none}.archive-actions .button:not(.primary){display:none}.archive-phase{width:100%;flex-wrap:wrap}.phase-track{width:120px}.stats-strip{grid-template-columns:repeat(3,1fr)}.stats-strip .stat:nth-child(2),.stats-strip .stat:nth-child(3),.stats-strip .stat:nth-child(5){display:none}.view-tabs{width:100%}.view-tabs .tab-btn{flex:1}.explorer{display:block;min-height:0}.folders-pane{display:none}.files-pane{border-left:0!important}.pane-head{height:auto;min-height:52px;flex-wrap:wrap}.filter-select{max-width:100px}.filter-popover{position:fixed;left:14px;right:14px;top:auto;width:auto}.file-columns{grid-template-columns:28px minmax(0,1fr) 72px}.file-columns .ratio-head{display:none}.selection-bar{position:sticky;top:0;z-index:4}.file-list{max-height:none}.file-list.virtualized{height:min(62svh,640px);max-height:none;overflow:auto}.file-row{grid-template-columns:28px minmax(0,1fr) 72px;height:58px;min-height:58px}.ratio-cell{display:none}.file-sub{display:block}.inspector-pane{display:none}.explorer.show-inspector .files-pane{display:none}.explorer.show-inspector .inspector-pane{display:block;border-top:0}.explorer.show-inspector #backToFiles{display:inline-flex!important}.inspector{max-height:none}.inspect-body{padding:13px}.preview{min-height:240px}.analysis{padding:12px}.section-grid,.safety-layout{grid-template-columns:1fr}.safety-layout{padding:12px}.analysis-grid{grid-template-columns:repeat(2,1fr)}.treemap{min-height:170px}.mobile-bar{position:fixed;z-index:45;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(4,1fr);padding:7px max(8px,env(safe-area-inset-right)) calc(7px + env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left));border-top:1px solid var(--line);background:color-mix(in srgb,var(--surface) 95%,transparent);backdrop-filter:blur(14px)}.mobile-bar button{min-height:46px;border:0;background:transparent;border-radius:9px;color:var(--muted);font-size:10px;font-weight:750;display:grid;place-items:center;gap:1px}.mobile-bar button.active{color:var(--accent);background:var(--accent-soft)}.mobile-bar svg{width:18px;height:18px}footer{padding-bottom:92px}
+    }
+    @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+  </style>
+</head>
+<body>
+<!-- APP:BEGIN -->
+<header class="app-header">
+  <div class="header-inner">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M4 8h16v12H4zM6.5 4.5h11V8h-11zM12 10v7M9.7 12.2h4.6M9.7 15h4.6" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/></svg>
+      </div>
+      <div class="brand-copy">
+        <h1 class="brand-name">Archive Explorer <span class="version-badge">v1.0.0</span></h1>
+        <p class="brand-meta" data-i18n="brandMeta">圧縮ファイルを、展開する前に理解する</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="language-button" id="langBtn" type="button" aria-label="Switch language">EN</button>
+      <button class="header-icon-button" id="helpBtn" type="button" aria-label="使い方と注意事項">
+        <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.8"/><path d="M9.8 9a2.35 2.35 0 0 1 4.5 1c0 1.8-2.3 2-2.3 3.7M12 17.2h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="page-intro">
+    <div>
+      <h2 data-i18n="heroTitle">解凍する前に、中身を確認。</h2>
+      <p data-i18n="heroDesc">構成・容量・圧縮率・注意点をブラウザ内で確認し、必要なファイルだけ取り出せます。</p>
+    </div>
+    <div class="local-badge">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M7 10V7a5 5 0 0 1 10 0v3M5 10h14v10H5z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+      <span data-i18n="localOnly">ファイルは端末の外へ送信しません</span>
+    </div>
+  </section>
+
+  <section id="emptyView" class="card drop-card">
+    <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-describedby="dropDesc">
+      <div>
+        <div class="drop-icon">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M4 8h16v11H4zM7 4.5h10V8M12 10v6M9.5 13.5 12 16l2.5-2.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <h3 data-i18n="dropTitle">アーカイブをここにドロップ</h3>
+        <p id="dropDesc" data-i18n="dropDesc">またはファイルを選択してください。処理はすべてこのブラウザ内で行われます。</p>
+        <button class="button primary" id="pickBtn" type="button" data-i18n="pickFile">ファイルを選択</button>
+        <div class="formats" data-i18n="formats">対応: ZIP / 7z / RAR5 / TAR / GZIP / TAR.GZ / TGZ / CAB / ISO / LZH</div>
+      </div>
+    </div>
+    <input id="fileInput" type="file" accept=".zip,.7z,.rar,.tar,.gz,.tgz,.tar.gz,.cab,.iso,.lzh,.lha,application/zip,application/x-7z-compressed,application/vnd.rar,application/x-rar-compressed,application/gzip,application/vnd.ms-cab-compressed,application/x-cab,application/x-iso9660-image,application/x-lzh-compressed" hidden>
+  </section>
+
+  <section id="appView" class="hidden">
+    <div class="card archive-head">
+      <div class="archive-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M4 8h16v12H4zM6.5 4.5h11V8M12 10v7M9.7 12.2h4.6M9.7 15h4.6" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/></svg></div>
+      <div class="archive-copy">
+        <div class="archive-name" id="archiveName">archive.zip</div>
+        <div class="archive-meta" id="archiveMeta">ZIP</div>
+        <div class="archive-capability hidden" id="archiveCapability" aria-live="polite"></div>
+        <div class="archive-phase" id="archivePhase"><span id="phaseText"></span><div class="phase-track hidden" id="phaseTrack"><div class="phase-fill" id="phaseFill"></div></div></div>
+      </div>
+      <div class="archive-actions">
+        <button class="button small hidden" id="backArchiveBtn" type="button" data-i18n="backArchive">親アーカイブへ</button>
+        <button class="button small" id="manifestBtn" type="button" data-i18n="exportList">一覧を書き出す</button>
+        <button class="button small primary" id="replaceBtn" type="button" data-i18n="openAnother">別のファイルを開く</button>
+      </div>
+    </div>
+
+    <div class="stats-strip">
+      <div class="stat"><span class="stat-label" data-i18n="files">ファイル</span><span class="stat-value" id="statFiles">0</span></div>
+      <div class="stat"><span class="stat-label" data-i18n="folders">フォルダ</span><span class="stat-value" id="statFolders">0</span></div>
+      <div class="stat"><span class="stat-label" data-i18n="packed">圧縮後</span><span class="stat-value" id="statPacked">-</span></div>
+      <div class="stat"><span class="stat-label" data-i18n="unpacked">展開後</span><span class="stat-value" id="statUnpacked">-</span></div>
+      <div class="stat"><span class="stat-label" data-i18n="saved">削減</span><span class="stat-value" id="statRatio">-</span></div>
+      <button class="stat" id="statWarningsCard" type="button" style="text-align:left;cursor:pointer"><span class="stat-label" data-i18n="safety">注意点</span><span class="stat-value" id="statWarnings">0</span></button>
+    </div>
+
+    <nav class="view-tabs" aria-label="Views">
+      <button class="tab-btn active" type="button" data-view="explorerView" data-i18n="explorer">エクスプローラー</button>
+      <button class="tab-btn" type="button" data-view="analysisView" data-i18n="analysis">分析</button>
+      <button class="tab-btn" type="button" data-view="safetyView"><span data-i18n="safety">注意点</span> <span id="warningBadge"></span></button>
+    </nav>
+
+    <section id="explorerView" class="view-panel">
+      <div class="card explorer" id="explorer">
+        <aside class="pane folders-pane">
+          <div class="pane-head"><span class="pane-title" data-i18n="folders">フォルダ</span><div class="pane-head-actions"><button class="pane-toggle" id="collapseFolders" type="button" data-i18n-aria="collapseFolders" aria-label="フォルダを隠す"><svg viewBox="0 0 24 24" fill="none"><path d="m15 6-6 6 6 6" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div></div>
+          <div class="folder-tree" id="folderTree"></div>
+        </aside>
+        <div class="pane-resizer" id="leftResizer" role="separator" aria-orientation="vertical" tabindex="0"></div>
+        <section class="pane files-pane">
+          <div class="pane-head">
+            <button class="pane-toggle hidden" id="showFolders" type="button" aria-label="フォルダを表示"><svg viewBox="0 0 24 24" fill="none"><path d="M3.5 7h6l2 2h9v10h-17z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg></button>
+            <div class="searchbox">
+              <svg viewBox="0 0 24 24" fill="none"><circle cx="10.5" cy="10.5" r="5.5" stroke="currentColor" stroke-width="1.8"/><path d="m15 15 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+              <input id="searchInput" type="search" data-i18n-placeholder="search" placeholder="ファイル名 / *.png / >10MB / ext:js">
+            </div>
+            <select id="typeFilter" class="filter-select" aria-label="Type filter">
+              <option value="all" data-i18n="allTypes">すべて</option>
+              <option value="image" data-i18n="images">画像</option>
+              <option value="text" data-i18n="text">テキスト</option>
+              <option value="code" data-i18n="code">コード</option>
+              <option value="archive" data-i18n="archives">アーカイブ</option>
+              <option value="other" data-i18n="other">その他</option>
+            </select>
+            <div class="filter-wrap">
+              <button class="filter-btn" id="filterBtn" type="button" aria-expanded="false"><span data-i18n="filter">絞り込み</span><span id="filterCount"></span></button>
+              <div class="filter-popover hidden" id="filterPopover">
+                <div class="filter-grid">
+                  <div class="filter-field"><label for="minSize" data-i18n="minSize">最小サイズ</label><input id="minSize" inputmode="decimal" placeholder="例: 1MB"></div>
+                  <div class="filter-field"><label for="maxSize" data-i18n="maxSize">最大サイズ</label><input id="maxSize" inputmode="decimal" placeholder="例: 100MB"></div>
+                </div>
+                <div class="filter-checks">
+                  <label class="check-row"><input type="checkbox" id="encryptedOnly"><span data-i18n="encryptedOnly">暗号化のみ</span></label>
+                  <label class="check-row"><input type="checkbox" id="warningOnly"><span data-i18n="warningOnly">注意点ありのみ</span></label>
+                </div>
+                <div class="filter-actions"><button class="button small ghost" id="clearFilters" type="button" data-i18n="clearFilters">条件をクリア</button></div>
+              </div>
+            </div>
+            <button class="pane-toggle hidden" id="showInspector" type="button" aria-label="Inspectorを表示"><svg viewBox="0 0 24 24" fill="none"><path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          </div>
+          <div class="breadcrumb" id="breadcrumb"></div>
+          <div class="selection-bar hidden" id="selectionBar"><strong id="selectionText"></strong><div class="selection-actions"><button class="button small primary" id="extractSelected" type="button" data-i18n="extractSelected">選択を取り出す</button><button class="button small ghost" id="clearSelection" type="button" data-i18n="clearSelection">解除</button></div></div>
+          <div class="file-columns"><span></span><button class="sort-btn active" data-sort="name" type="button" data-i18n="name">名前</button><button class="sort-btn numeric" data-sort="size" type="button" data-i18n="sizeShort">サイズ</button><button class="sort-btn numeric ratio-head" data-sort="ratio" type="button" data-i18n="ratioShort">圧縮率</button></div>
+          <div class="file-list" id="fileList" tabindex="0"></div>
+        </section>
+        <div class="pane-resizer" id="rightResizer" role="separator" aria-orientation="vertical" tabindex="0"></div>
+        <aside class="pane inspector-pane">
+          <div class="pane-head">
+            <button class="button small ghost hidden" id="backToFiles" type="button" data-i18n="back">戻る</button>
+            <span class="pane-title" data-i18n="inspector">Inspector</span>
+            <div class="pane-head-actions"><button class="pane-toggle" id="collapseInspector" type="button" aria-label="Inspectorを隠す"><svg viewBox="0 0 24 24" fill="none"><path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
+          </div>
+          <div class="inspector" id="inspector">
+            <div class="inspector-empty" data-i18n="selectFile">ファイルを選択すると、詳細とプレビューを表示します。</div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="analysisView" class="view-panel hidden">
+      <div class="card analysis">
+        <div class="analysis-grid" id="analysisCards"></div>
+        <div class="section-grid">
+          <div class="analysis-section"><h3 data-i18n="largestFolders">容量を使っている場所</h3><div id="folderBars"></div></div>
+          <div class="analysis-section"><h3 data-i18n="fileTypes">ファイル種別</h3><div id="typeBars"></div></div>
+        </div>
+        <div class="analysis-section" style="margin-top:12px">
+          <div class="map-head"><h3 data-i18n="archiveMap">Archive Map</h3><div class="map-breadcrumb" id="mapBreadcrumb"></div><button class="button small ghost hidden" id="mapUp" type="button" data-i18n="up">上へ</button></div>
+          <div class="treemap" id="treemap"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="safetyView" class="view-panel hidden">
+      <div class="card safety-layout">
+        <div>
+          <div class="notice-list" id="noticeList"></div>
+        </div>
+        <div class="analysis-section">
+          <h3 data-i18n="duplicates">重複候補</h3>
+          <div id="duplicateList"></div>
+        </div>
+      </div>
+    </section>
+  </section>
+</main>
+
+<footer>Archive Explorer · Browser Kitty · <span data-i18n="footer">ローカル処理 / 外部送信なし</span></footer>
+
+<div class="mobile-bar hidden" id="mobileBar">
+  <button type="button" data-mobile-view="explorerView" class="active"><svg viewBox="0 0 24 24" fill="none"><path d="M4 7h6l2 2h8v10H4z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg><span data-i18n="browse">見る</span></button>
+  <button type="button" data-mobile-view="analysisView"><svg viewBox="0 0 24 24" fill="none"><path d="M5 18V9M12 18V5M19 18v-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span data-i18n="analysis">分析</span></button>
+  <button type="button" data-mobile-view="safetyView"><svg viewBox="0 0 24 24" fill="none"><path d="m12 4 8 15H4zM12 9v4M12 16h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span data-i18n="safety">注意点</span></button>
+  <button type="button" id="mobileSave"><svg viewBox="0 0 24 24" fill="none"><path d="M6 4h10l3 3v13H6zM9 4v6h7V4M9 16h6" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg><span data-i18n="saveSelected">保存</span></button>
+</div>
+
+<!-- APP:HELP:BEGIN -->
+<dialog id="helpDialog">
+  <div class="dialog-head"><h2 data-i18n="helpTitle">使い方と注意事項</h2><button class="header-icon-button" type="button" data-dialog-close aria-label="Close">✕</button></div>
+  <div class="dialog-body">
+    <h3 data-i18n="helpHowTitle">基本操作</h3>
+    <p data-i18n="helpHow">ZIP / TAR / GZIP / TAR.GZ を選ぶと、フォルダへ展開せずに一覧・容量・圧縮率を確認できます。ファイルを選ぶと内容を必要な分だけメモリ上で展開してプレビューします。</p>
+    <h3 data-i18n="helpPrivacyTitle">プライバシー</h3>
+    <p data-i18n="helpPrivacy">選択したファイルはサーバーへ送信しません。解析・プレビュー・保存処理はブラウザ内だけで行います。</p>
+    <h3 data-i18n="helpNotesTitle">注意事項</h3>
+    <ul>
+      <li data-i18n="helpNote1">ZIPはStored / Deflateと従来方式（ZipCrypto）の暗号化ZIPに対応します。パスワードは必要な操作時にだけ入力し、保存しません。AES暗号化ZIP、Deflate64、ZIP64の一部は開けない場合があります。</li>
+      <li data-i18n="helpNote2">CAB / ISO / LZH、RAR5（無圧縮）、LZMA形式の7zに対応します。圧縮RAR/LZH/CABやLZMA2など一部7zは取り出せない場合があります。</li>
+      <li data-i18n="helpNote3">巨大なTAR.GZやsolid 7zは、解析・取り出し時に大きなデータをメモリ上へ展開するため、端末メモリを多く使用する場合があります。</li>
+      <li data-i18n="helpNote4">「注意点」は危険性を断定するものではありません。内容確認の目安として利用してください。</li>
+    </ul>
+  </div>
+  <div class="dialog-actions"><button class="button primary" type="button" data-dialog-close data-i18n="close">閉じる</button></div>
+</dialog>
+<!-- APP:HELP:END -->
+
+<dialog id="exportDialog">
+  <div class="dialog-head"><h2 id="exportDialogTitle">一覧を書き出す</h2><button class="header-icon-button" type="button" data-export-close>✕</button></div>
+  <div class="dialog-body">
+    <label class="field-label" for="exportName" data-i18n="filename">ファイル名</label>
+    <div class="filename-control"><input id="exportName" value="archive-list"><span id="exportExt">.json</span></div>
+    <div id="exportFormatRow" style="display:flex;gap:7px;margin-top:12px">
+      <button type="button" class="button small primary" data-format="json">JSON</button>
+      <button type="button" class="button small" data-format="csv">CSV</button>
+      <button type="button" class="button small" data-format="txt">TXT</button>
+    </div>
+  </div>
+  <div class="dialog-actions"><button class="button" type="button" data-export-close data-i18n="cancel">キャンセル</button><button class="button primary" id="doExport" type="button" data-i18n="export">書き出す</button></div>
+</dialog>
+
+<dialog id="passwordDialog">
+  <form id="passwordForm" method="dialog">
+    <div class="dialog-head"><h2 data-i18n="passwordTitle">パスワードが必要です</h2><button class="header-icon-button" id="passwordClose" type="button" aria-label="Close">✕</button></div>
+    <div class="dialog-body">
+      <div class="password-target" id="passwordTarget"></div>
+      <label class="field-label" for="archivePassword" data-i18n="passwordLabel">パスワード</label>
+      <div class="password-field"><input id="archivePassword" type="password" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="password-toggle" id="passwordToggle" type="button" data-i18n-aria="showPassword" aria-label="パスワードを表示"><svg viewBox="0 0 24 24" fill="none"><path d="M3 12s3.2-5 9-5 9 5 9 5-3.2 5-9 5-9-5-9-5Z" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="12" r="2.5" stroke="currentColor" stroke-width="1.7"/></svg></button></div>
+      <div class="password-error hidden" id="passwordError" role="alert"></div>
+      <div class="password-note"><svg viewBox="0 0 24 24" fill="none"><path d="M7 10V7a5 5 0 0 1 10 0v3M6 10h12v10H6z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg><span data-i18n="passwordPrivacy">パスワードはこのアーカイブを開いている間だけメモリ上に保持し、保存しません。</span></div>
+    </div>
+    <div class="dialog-actions"><button class="button" id="passwordCancel" type="button" data-i18n="cancel">キャンセル</button><button class="button primary" id="passwordSubmit" type="submit" data-i18n="unlock">ロック解除</button></div>
+  </form>
+</dialog>
+
+<div class="toast hidden" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* LZMA-JS decompressor (MIT) - https://github.com/LZMA-JS/LZMA-JS */
+var e=function(){"use strict";function r(e,r){postMessage({action:nr,cbn:r,result:e})}function o(e){var r=[];return r[e-1]=void 0,r}function n(e,r){return i(e[0]+r[0],e[1]+r[1])}function t(e,r){var o,n;return e[0]==r[0]&&e[1]==r[1]?0:(o=0>e[1],n=0>r[1],o&&!n?-1:!o&&n?1:d(e,r)[1]<0?-1:1)}function i(e,r){var o,n;for(r%=0x10000000000000000,e%=0x10000000000000000,o=r%ir,n=Math.floor(e/ir)*ir,r=r-o+n,e=e-n+o;0>e;)e+=ir,r-=ir;for(;e>4294967295;)e-=ir,r+=ir;for(r%=0x10000000000000000;r>0x7fffffff00000000;)r-=0x10000000000000000;for(;-0x8000000000000000>r;)r+=0x10000000000000000;return[e,r]}function u(e){return e>=0?[e,0]:[e+ir,-ir]}function s(e){return e[0]>=2147483648?~~Math.max(Math.min(e[0]-ir,2147483647),-2147483648):~~Math.max(Math.min(e[0],2147483647),-2147483648)}function d(e,r){return i(e[0]-r[0],e[1]-r[1])}function c(e,r){return e.ab=r,e.cb=0,e.O=r.length,e}function m(e){return e.cb>=e.O?-1:255&e.ab[e.cb++]}function a(e){return e.ab=o(32),e.O=0,e}function _(e){var r=e.ab;return r.length=e.O,r}function f(e,r,o,n){p(r,o,e.ab,e.O,n),e.O+=n}function p(e,r,o,n,t){for(var i=0;t>i;++i)o[n+i]=e[r+i]}function D(e,r,o){var n,t,i,s,d="",c=[];for(t=0;5>t;++t){if(i=m(r),-1==i)throw Error("truncated input");c[t]=i<<24>>24}if(n=N({}),!z(n,c))throw Error("corrupted input");for(t=0;64>t;t+=8){if(i=m(r),-1==i)throw Error("truncated input");i=i.toString(16),1==i.length&&(i="0"+i),d=i+""+d}/^0+$|^f+$/i.test(d)?e.N=ur:(s=parseInt(d,16),e.N=s>4294967295?ur:u(s)),e.Q=B(n,r,o,e.N)}function l(e,r){return e.S=a({}),D(e,c({},r),e.S),e}function g(e,r,o){var n=e.D-r-1;for(0>n&&(n+=e.c);0!=o;--o)n>=e.c&&(n=0),e.x[e.D++]=e.x[n++],e.D>=e.c&&w(e)}function v(e,r){(null==e.x||e.c!=r)&&(e.x=o(r)),e.c=r,e.D=0,e.w=0}function w(e){var r=e.D-e.w;r&&(f(e.V,e.x,e.w,r),e.D>=e.c&&(e.D=0),e.w=e.D)}function R(e,r){var o=e.D-r-1;return 0>o&&(o+=e.c),e.x[o]}function h(e,r){e.x[e.D++]=r,e.D>=e.c&&w(e)}function P(e){w(e),e.V=null}function C(e){return e-=2,4>e?e:3}function S(e){return 4>e?0:10>e?e-3:e-6}function M(e,r){return e.h=r,e.bb=null,e.X=1,e}function L(e){if(!e.X)throw Error("bad state");if(e.bb)throw Error("No encoding");return y(e),e.X}function y(e){var r=I(e.h);if(-1==r)throw Error("corrupted input");e.$=ur,e.Z=e.h.d,(r||t(e.h.U,sr)>=0&&t(e.h.d,e.h.U)>=0)&&(w(e.h.b),P(e.h.b),e.h.a.K=null,e.X=0)}function B(e,r,o,n){return e.a.K=r,P(e.b),e.b.V=o,b(e),e.f=0,e.l=0,e.T=0,e.R=0,e._=0,e.U=n,e.d=sr,e.I=0,M({},e)}function I(e){var r,o,i,d,c,m;if(m=s(e.d)&e.P,Q(e.a,e.q,(e.f<<4)+m)){if(Q(e.a,e.E,e.f))i=0,Q(e.a,e.s,e.f)?(Q(e.a,e.u,e.f)?(Q(e.a,e.r,e.f)?(o=e._,e._=e.R):o=e.R,e.R=e.T):o=e.T,e.T=e.l,e.l=o):Q(e.a,e.n,(e.f<<4)+m)||(e.f=7>e.f?9:11,i=1),i||(i=x(e.o,e.a,m)+2,e.f=7>e.f?8:11);else if(e._=e.R,e.R=e.T,e.T=e.l,i=2+x(e.C,e.a,m),e.f=7>e.f?7:10,c=q(e.j[C(i)],e.a),c>=4){if(d=(c>>1)-1,e.l=(2|1&c)<<d,14>c)e.l+=J(e.J,e.l-c-1,e.a,d);else if(e.l+=U(e.a,d-4)<<4,e.l+=F(e.t,e.a),0>e.l)return-1==e.l?1:-1}else e.l=c;if(t(u(e.l),e.d)>=0||e.l>=e.m)return-1;g(e.b,e.l,i),e.d=n(e.d,u(i)),e.I=R(e.b,0)}else r=Z(e.k,s(e.d),e.I),e.I=7>e.f?T(r,e.a):$(r,e.a,R(e.b,e.l)),h(e.b,e.I),e.f=S(e.f),e.d=n(e.d,dr);return 0}function N(e){e.b={},e.a={},e.q=o(192),e.E=o(12),e.s=o(12),e.u=o(12),e.r=o(12),e.n=o(192),e.j=o(4),e.J=o(114),e.t=K({},4),e.C=G({}),e.o=G({}),e.k={};for(var r=0;4>r;++r)e.j[r]=K({},6);return e}function b(e){e.b.w=0,e.b.D=0,X(e.q),X(e.n),X(e.E),X(e.s),X(e.u),X(e.r),X(e.J),H(e.k);for(var r=0;4>r;++r)X(e.j[r].B);A(e.C),A(e.o),X(e.t.B),V(e.a)}function z(e,r){var o,n,t,i,u,s,d;if(5>r.length)return 0;for(d=255&r[0],t=d%9,s=~~(d/9),i=s%5,u=~~(s/5),o=0,n=0;4>n;++n)o+=(255&r[1+n])<<8*n;return o>99999999||!W(e,t,i,u)?0:O(e,o)}function O(e,r){return 0>r?0:(e.z!=r&&(e.z=r,e.m=Math.max(e.z,1),v(e.b,Math.max(e.m,4096))),1)}function W(e,r,o,n){if(r>8||o>4||n>4)return 0;E(e.k,o,r);var t=1<<n;return k(e.C,t),k(e.o,t),e.P=t-1,1}function k(e,r){for(;r>e.e;++e.e)e.G[e.e]=K({},3),e.H[e.e]=K({},3)}function x(e,r,o){if(!Q(r,e.M,0))return q(e.G[o],r);var n=8;return n+=Q(r,e.M,1)?8+q(e.L,r):q(e.H[o],r)}function G(e){return e.M=o(2),e.G=o(16),e.H=o(16),e.L=K({},8),e.e=0,e}function A(e){X(e.M);for(var r=0;e.e>r;++r)X(e.G[r].B),X(e.H[r].B);X(e.L.B)}function E(e,r,n){var t,i;if(null==e.F||e.g!=n||e.y!=r)for(e.y=r,e.Y=(1<<r)-1,e.g=n,i=1<<e.g+e.y,e.F=o(i),t=0;i>t;++t)e.F[t]=j({})}function Z(e,r,o){return e.F[((r&e.Y)<<e.g)+((255&o)>>>8-e.g)]}function H(e){var r,o;for(o=1<<e.g+e.y,r=0;o>r;++r)X(e.F[r].v)}function T(e,r){var o=1;do o=o<<1|Q(r,e.v,o);while(256>o);return o<<24>>24}function $(e,r,o){var n,t,i=1;do if(t=o>>7&1,o<<=1,n=Q(r,e.v,(1+t<<8)+i),i=i<<1|n,t!=n){for(;256>i;)i=i<<1|Q(r,e.v,i);break}while(256>i);return i<<24>>24}function j(e){return e.v=o(768),e}function K(e,r){return e.A=r,e.B=o(1<<r),e}function q(e,r){var o,n=1;for(o=e.A;0!=o;--o)n=(n<<1)+Q(r,e.B,n);return n-(1<<e.A)}function F(e,r){var o,n,t=1,i=0;for(n=0;e.A>n;++n)o=Q(r,e.B,t),t<<=1,t+=o,i|=o<<n;return i}function J(e,r,o,n){var t,i,u=1,s=0;for(i=0;n>i;++i)t=Q(o,e,r+u),u<<=1,u+=t,s|=t<<i;return s}function Q(e,r,o){var n,t=r[o];return n=(e.i>>>11)*t,(-2147483648^n)>(-2147483648^e.p)?(e.i=n,r[o]=t+(2048-t>>>5)<<16>>16,-16777216&e.i||(e.p=e.p<<8|m(e.K),e.i<<=8),0):(e.i-=n,e.p-=n,r[o]=t-(t>>>5)<<16>>16,-16777216&e.i||(e.p=e.p<<8|m(e.K),e.i<<=8),1)}function U(e,r){var o,n,t=0;for(o=r;0!=o;--o)e.i>>>=1,n=e.p-e.i>>>31,e.p-=e.i&n-1,t=t<<1|1-n,-16777216&e.i||(e.p=e.p<<8|m(e.K),e.i<<=8);return t}function V(e){e.p=0,e.i=-1;for(var r=0;5>r;++r)e.p=e.p<<8|m(e.K)}function X(e){for(var r=e.length-1;r>=0;--r)e[r]=1024}function Y(e){for(var r,o,n,t=0,i=0,u=e.length,s=[],d=[];u>t;++t,++i){if(r=255&e[t],128&r)if(192==(224&r)){if(t+1>=u)return e;if(o=255&e[++t],128!=(192&o))return e;d[i]=(31&r)<<6|63&o}else{if(224!=(240&r))return e;if(t+2>=u)return e;if(o=255&e[++t],128!=(192&o))return e;if(n=255&e[++t],128!=(192&n))return e;d[i]=(15&r)<<12|(63&o)<<6|63&n}else{if(!r)return e;d[i]=r}16383==i&&(s.push(String.fromCharCode.apply(String,d)),i=-1)}return i>0&&(d.length=i,s.push(String.fromCharCode.apply(String,d))),s.join("")}function er(e){return e[1]+e[0]}function rr(e,o,n){function t(){try{for(var e,r=0,u=(new Date).getTime();L(c.d.Q);)if(++r%1e3==0&&(new Date).getTime()-u>200)return s&&(i=er(c.d.Q.h.d)/d,n(i)),tr(t,0),0;n(1),e=Y(_(c.d.S)),tr(o.bind(null,e),0)}catch(m){o(null,m)}}var i,u,s,d,c={},m=void 0===o&&void 0===n;if("function"!=typeof o&&(u=o,o=n=0),n=n||function(e){return void 0!==u?r(s?e:-1,u):void 0},o=o||function(e,r){return void 0!==u?postMessage({action:or,cbn:u,result:e,error:r}):void 0},m){for(c.d=l({},e);L(c.d.Q););return Y(_(c.d.S))}try{c.d=l({},e),d=er(c.d.N),s=d>-1,n(0)}catch(a){return o(null,a)}tr(t,0)}var or=2,nr=3,tr="function"==typeof setImmediate?setImmediate:setTimeout,ir=4294967296,ur=[4294967295,-ir],sr=[0,0],dr=[1,0];return"undefined"==typeof onmessage||"undefined"!=typeof window&&void 0!==window.document||!function(){onmessage=function(r){r&&r.W&&r.W.action==or&&e.decompress(r.W.W,r.W.cbn)}}(),{decompress:rr}}();this.LZMA=this.LZMA_WORKER=e;
+(() => {
+  'use strict';
+
+  const I = {
+    ja:{
+      brandMeta:'圧縮ファイルを、展開する前に理解する',heroTitle:'解凍する前に、中身を確認。',heroDesc:'構成・容量・圧縮率・注意点をブラウザ内で確認し、必要なファイルだけ取り出せます。',
+      localOnly:'ファイルは端末の外へ送信しません',dropTitle:'アーカイブをここにドロップ',dropDesc:'またはファイルを選択してください。処理はすべてこのブラウザ内で行われます。',pickFile:'ファイルを選択',
+      formats:'対応: ZIP / 7z / RAR5 / TAR / GZIP / TAR.GZ / TGZ / CAB / ISO / LZH',exportList:'一覧を書き出す',openAnother:'別のファイルを開く',files:'ファイル',folders:'フォルダ',packed:'圧縮後',unpacked:'展開後',saved:'削減',
+      explorer:'エクスプローラー',analysis:'分析',safety:'注意点',search:'ファイルを検索',allTypes:'すべて',images:'画像',text:'テキスト',code:'コード',archives:'アーカイブ',other:'その他',
+      inspector:'Inspector',selectFile:'ファイルを選択すると、詳細とプレビューを表示します。',back:'戻る',largestFolders:'容量を使っている場所',fileTypes:'ファイル種別',archiveMap:'Archive Map',duplicates:'重複候補',
+      browse:'見る',saveSelected:'保存',footer:'ローカル処理 / 外部送信なし',helpTitle:'使い方と注意事項',helpHowTitle:'基本操作',helpHow:'対応アーカイブをフォルダへ展開せずに一覧・容量・圧縮率を確認できます。アーカイブごとに取り出し可能範囲を表示し、大量ファイルは仮想スクロールで軽量表示します。未知のバイナリは先頭4KiBをHexで確認できます。検索は *.png / >10MB / ext:js に対応します。',
+      helpPrivacyTitle:'プライバシー',helpPrivacy:'選択したファイルはサーバーへ送信しません。解析・プレビュー・保存処理はブラウザ内だけで行います。入力したアーカイブパスワードも保存せず、現在のアーカイブを閉じると破棄します。',helpNotesTitle:'注意事項',
+      helpNote1:'ZIPはStored / Deflateと従来方式（ZipCrypto）の暗号化ZIPに対応します。パスワードは必要な操作の直前にだけ入力し、アーカイブを閉じるまでメモリ上だけに保持します。AES暗号化ZIP、Deflate64、ZIP64の一部は開けない場合があります。',helpNote2:'CAB / ISO / LZH、RAR5（無圧縮）、LZMA形式の7zに対応します。圧縮RAR/LZH/CABやLZMA2など一部7zは取り出せない場合があります。',helpNote3:'巨大なTAR.GZやsolid 7zは、解析・取り出し時に大きなデータをメモリ上へ展開するため、端末メモリを多く使用する場合があります。',helpNote4:'「注意点」は危険性を断定するものではありません。内容確認の目安として利用してください。',
+      close:'閉じる',filename:'ファイル名',cancel:'キャンセル',export:'書き出す',root:'ルート',emptyFolder:'このフォルダには表示できる項目がありません。',extract:'取り出す',preview:'プレビュー',
+      path:'パス',size:'展開後サイズ',compressedSize:'圧縮後サイズ',ratio:'圧縮率',method:'圧縮方式',modified:'更新日時',crc:'CRC32',encrypted:'暗号化',yes:'あり',no:'なし',
+      noPreview:'このファイル形式はプレビューしません。必要な場合は取り出して確認してください。',tooLargePreview:'プレビューには大きすぎるため表示を省略しました。',previewFailed:'プレビューできませんでした。',
+      selectedCount:n=>`${n}件選択`,nothingSelected:'保存するファイルを選択してください。',saving:'ファイルを準備しています…',savedToast:'保存ファイルを作成しました。',manifestDone:'一覧を書き出しました。',
+      typeImage:'画像',typeText:'テキスト',typeCode:'コード',typeArchive:'アーカイブ',typePdf:'PDF',typeOther:'その他',
+      totalFiles:'総ファイル数',totalSize:'展開後サイズ',compressedTotal:'圧縮後サイズ',compressionSaving:'削減率',none:'なし',noDuplicates:'重複候補はありません。',
+      safetyOk:'目立った注意点は見つかりませんでした。',safetyOkDesc:'危険性がないことを保証するものではありません。ファイルを実行する前には内容を確認してください。',
+      warnTraversal:'不審なパス',warnTraversalDesc:'親フォルダ参照（../）や絶対パスを含む項目があります。展開先の外へ書き込む攻撃で使われる場合があります。',
+      warnExecutable:'実行可能・スクリプト',warnExecutableDesc:'実行可能ファイルやスクリプトが含まれています。出所が不明な場合は実行しないでください。',
+      warnDoubleExt:'二重拡張子',warnDoubleExtDesc:'見た目を別のファイル形式に装う可能性がある二重拡張子があります。',
+      warnBomb:'極端な圧縮率',warnBombDesc:'圧縮後に比べて展開後サイズが非常に大きい項目があります。大量のメモリやストレージを消費する可能性があります。',
+      warnEncrypted:'暗号化ファイル',warnEncryptedDesc:'暗号化された項目があります。対応方式では必要な操作時にパスワードを求めます。パスワードは保存しません。',
+      warnNested:'入れ子アーカイブ',warnNestedDesc:'アーカイブの中に別のアーカイブが含まれています。',
+      warnUnsupported:'未対応の圧縮方式',warnUnsupportedDesc:'一覧は確認できますが、このブラウザ版では取り出せない圧縮方式の項目があります。',
+      unsupportedFormat:'この形式はまだ開けません。ZIP / TAR / GZIP / TAR.GZ / CAB / ISO / LZH / RAR5 / 7z（LZMA）に対応しています。',invalidArchive:'アーカイブを解析できませんでした。ファイルが壊れているか、未対応の形式の可能性があります。',encryptedArchiveUnsupported:'暗号化されたアーカイブですが、この暗号化方式には現在対応していません。',
+      unsupportedZip64:'ZIP64の大容量エントリはこのリリースでは完全対応していません。',backFiles:'ファイル一覧へ',backArchive:'親アーカイブへ',folderLabel:'フォルダ',filter:'絞り込み',minSize:'最小サイズ',maxSize:'最大サイズ',encryptedOnly:'暗号化のみ',warningOnly:'注意点ありのみ',clearFilters:'条件をクリア',extractSelected:'選択を取り出す',clearSelection:'解除',name:'名前',sizeShort:'サイズ',ratioShort:'圧縮率',details:'詳細',notes:'注意点',openNested:'アーカイブとして開く',noFileNotes:'このファイルに固有の注意点はありません。',collapseFolders:'フォルダを隠す',up:'上へ',phaseDetect:'形式を確認中…',phaseList:'ファイル一覧を解析中…',phaseAnalyze:'注意点と構成を分析中…',phaseReady:'解析完了',searchHint:'ファイル名 / *.png / >10MB / ext:js',capAll:'すべて取り出し可能',capPartial:(ok,total)=>`${ok}/${total}ファイルを取り出し可能`,capListOnly:'一覧のみ確認可能',capUnsupported:n=>`未対応 ${n}`,capEncrypted:n=>`暗号化 ${n}`,capPassword:n=>`パスワード必要 ${n}`,capUnlocked:n=>`ロック解除済み ${n}`,capEncryptedUnsupported:n=>`暗号化方式未対応 ${n}`,entryUnsupported:'未対応',entryEncrypted:'暗号化',entryPassword:'パスワード必要',entryUnlocked:'解除済み',entryEncryptionUnsupported:'暗号化方式未対応',cannotExtract:'取り出し不可',cannotExtractMethod:'未対応の圧縮方式のため取り出せません。',cannotExtractEncrypted:'この暗号化方式には対応していません。',passwordTitle:'パスワードが必要です',passwordLabel:'パスワード',passwordPrivacy:'パスワードはこのアーカイブを開いている間だけメモリ上に保持し、保存しません。',passwordFor:n=>`${n} を開くためにパスワードを入力してください。`,unlock:'ロック解除',showPassword:'パスワードを表示',hidePassword:'パスワードを隠す',wrongPassword:'パスワードが正しくありません。もう一度入力してください。',passwordCancelled:'パスワード入力をキャンセルしました。',encryptionScheme:'暗号化方式',passwordMemory:'パスワード保持',memoryOnly:'このアーカイブを閉じるまで（保存しません）',zipCrypto:'従来方式 (ZipCrypto)',aesUnsupported:'AES暗号化ZIPは現在未対応です。',hexPreview:'Hexプレビュー',hexShowing:n=>`先頭 ${n} bytes`,detectedType:'実体',extractability:'取り出し',available:'可能',unavailable:'不可',unknownBinary:'不明なバイナリ',hexTooLarge:'この圧縮方式では先頭だけを読むにも全体展開が必要なため、巨大ファイルのHexプレビューを省略しました。'
+    },
+    en:{
+      brandMeta:'Understand archives before extracting them',heroTitle:'Inspect first. Extract only what you need.',heroDesc:'Explore structure, size, compression and notable risks locally in your browser.',
+      localOnly:'Your files never leave this device',dropTitle:'Drop an archive here',dropDesc:'Or choose a file. All processing stays inside this browser.',pickFile:'Choose file',
+      formats:'Supports: ZIP / 7z / RAR5 / TAR / GZIP / TAR.GZ / TGZ / CAB / ISO / LZH',exportList:'Export list',openAnother:'Open another',files:'Files',folders:'Folders',packed:'Packed',unpacked:'Unpacked',saved:'Saved',
+      explorer:'Explorer',analysis:'Analysis',safety:'Notes',search:'Search files',allTypes:'All',images:'Images',text:'Text',code:'Code',archives:'Archives',other:'Other',
+      inspector:'Inspector',selectFile:'Select a file to see details and preview.',back:'Back',largestFolders:'Largest areas',fileTypes:'File types',archiveMap:'Archive Map',duplicates:'Duplicate candidates',
+      browse:'Browse',saveSelected:'Save',footer:'Local processing / no uploads',helpTitle:'How to use & notes',helpHowTitle:'Basics',helpHow:'Inspect supported archives without extracting to a folder. Archive-level capability shows what can be extracted, very large lists use virtual scrolling, and unknown binaries get a 4 KiB Hex preview. Search supports *.png / >10MB / ext:js.',
+      helpPrivacyTitle:'Privacy',helpPrivacy:'Selected files are not uploaded. Analysis, preview and export are performed only in this browser. Archive passwords are never saved and are discarded when the current archive is closed.',helpNotesTitle:'Notes',
+      helpNote1:'ZIP supports Stored / Deflate and traditional ZipCrypto encryption. A password is requested only when needed and kept only in memory until the archive is closed. AES-encrypted ZIP, Deflate64 and some ZIP64 archives may not extract.',helpNote2:'CAB / ISO / LZH, stored RAR5, and LZMA-based 7z are supported. Some 7z methods such as LZMA2 and compressed RAR/LZH/CAB entries may not extract.',helpNote3:'Large TAR.GZ and solid 7z archives can expand large data in memory while listing or extracting entries.',helpNote4:'Safety notes are heuristics, not a guarantee that a file is safe or unsafe.',
+      close:'Close',filename:'File name',cancel:'Cancel',export:'Export',root:'Root',emptyFolder:'No matching items in this folder.',extract:'Extract',preview:'Preview',
+      path:'Path',size:'Unpacked size',compressedSize:'Packed size',ratio:'Compression',method:'Method',modified:'Modified',crc:'CRC32',encrypted:'Encrypted',yes:'Yes',no:'No',
+      noPreview:'Preview is not available for this file type. Extract it if you need to inspect it.',tooLargePreview:'Preview skipped because this file is too large.',previewFailed:'Could not preview this file.',
+      selectedCount:n=>`${n} selected`,nothingSelected:'Select files to save.',saving:'Preparing files…',savedToast:'Download prepared.',manifestDone:'List exported.',
+      typeImage:'Image',typeText:'Text',typeCode:'Code',typeArchive:'Archive',typePdf:'PDF',typeOther:'Other',
+      totalFiles:'Total files',totalSize:'Unpacked size',compressedTotal:'Packed size',compressionSaving:'Savings',none:'None',noDuplicates:'No duplicate candidates.',
+      safetyOk:'No notable issues found.',safetyOkDesc:'This does not guarantee safety. Inspect files before running them.',
+      warnTraversal:'Suspicious paths',warnTraversalDesc:'Some entries contain parent traversal (../) or absolute paths that can be abused to write outside an extraction folder.',
+      warnExecutable:'Executables / scripts',warnExecutableDesc:'Executables or scripts are present. Avoid running files from an untrusted source.',
+      warnDoubleExt:'Double extensions',warnDoubleExtDesc:'Some names use double extensions that can disguise an executable as another file type.',
+      warnBomb:'Extreme compression ratio',warnBombDesc:'Some entries expand dramatically compared with their packed size and may consume excessive memory or storage.',
+      warnEncrypted:'Encrypted files',warnEncryptedDesc:'Encrypted entries are present. Supported encryption prompts for a password only when an operation needs file contents. Passwords are never saved.',
+      warnNested:'Nested archives',warnNestedDesc:'The archive contains other archive files.',
+      warnUnsupported:'Unsupported compression',warnUnsupportedDesc:'The list is readable, but some ZIP entries use compression methods this browser build cannot extract.',
+      unsupportedFormat:'This format is not supported yet. Supported: ZIP / TAR / GZIP / TAR.GZ / CAB / ISO / LZH / stored RAR5 / LZMA 7z.',invalidArchive:'Could not parse this archive. It may be damaged or use an unsupported format.',encryptedArchiveUnsupported:'This archive is encrypted with a method that is not supported yet.',
+      unsupportedZip64:'Large ZIP64 entries are not fully supported in this release.',backFiles:'Back to files',backArchive:'Parent archive',folderLabel:'Folder',filter:'Filter',minSize:'Minimum size',maxSize:'Maximum size',encryptedOnly:'Encrypted only',warningOnly:'With notes only',clearFilters:'Clear filters',extractSelected:'Extract selected',clearSelection:'Clear',name:'Name',sizeShort:'Size',ratioShort:'Ratio',details:'Details',notes:'Notes',openNested:'Open as archive',noFileNotes:'No file-specific notes.',collapseFolders:'Hide folders',up:'Up',phaseDetect:'Detecting format…',phaseList:'Reading file list…',phaseAnalyze:'Analyzing structure and notes…',phaseReady:'Ready',searchHint:'Name / *.png / >10MB / ext:js',capAll:'All files extractable',capPartial:(ok,total)=>`${ok}/${total} files extractable`,capListOnly:'List only',capUnsupported:n=>`${n} unsupported`,capEncrypted:n=>`${n} encrypted`,capPassword:n=>`${n} need password`,capUnlocked:n=>`${n} unlocked`,capEncryptedUnsupported:n=>`${n} unsupported encryption`,entryUnsupported:'Unsupported',entryEncrypted:'Encrypted',entryPassword:'Password required',entryUnlocked:'Unlocked',entryEncryptionUnsupported:'Encryption unsupported',cannotExtract:'Cannot extract',cannotExtractMethod:'This compression method is not supported for extraction.',cannotExtractEncrypted:'This encryption method is not supported.',passwordTitle:'Password required',passwordLabel:'Password',passwordPrivacy:'The password is kept only in memory while this archive is open and is never saved.',passwordFor:n=>`Enter the password to open ${n}.`,unlock:'Unlock',showPassword:'Show password',hidePassword:'Hide password',wrongPassword:'That password is incorrect. Try again.',passwordCancelled:'Password entry was cancelled.',encryptionScheme:'Encryption',passwordMemory:'Password retention',memoryOnly:'Until this archive is closed (never saved)',zipCrypto:'Traditional (ZipCrypto)',aesUnsupported:'AES-encrypted ZIP is not supported yet.',hexPreview:'Hex preview',hexShowing:n=>`First ${n} bytes`,detectedType:'Detected',extractability:'Extraction',available:'Available',unavailable:'Unavailable',unknownBinary:'Unknown binary',hexTooLarge:'This compression method requires full decompression even for a prefix, so Hex preview is skipped for this very large file.'
+    }
+  };
+
+  const $ = s => document.querySelector(s);
+  const $$ = s => [...document.querySelectorAll(s)];
+  const state = {lang:'ja',file:null,type:'',entries:[],cwd:'',active:null,selected:new Set(),expandedFolders:new Set(['']),previewUrl:null,search:'',typeFilter:'all',warnings:[],duplicates:[],generation:0,exportFormat:'json',sortKey:'name',sortDir:'asc',keyboardPath:null,inspectorTab:'preview',filterMin:'',filterMax:'',encryptedOnly:false,warningOnly:false,archiveStack:[],analysisPath:'',phase:'',leftCollapsed:false,rightCollapsed:false,virtualItems:[],virtualSearching:false,virtualized:false,listContextKey:'',virtualStart:-1,archivePassword:null,passwordPending:null,passwordEntry:null,_passwordResolve:null};
+  const UTF8 = new TextDecoder('utf-8',{fatal:false});
+  let UTF8_FATAL;try{UTF8_FATAL=new TextDecoder('utf-8',{fatal:true})}catch{UTF8_FATAL=UTF8}
+  let ANSI; try{ANSI=new TextDecoder('windows-1252')}catch{ANSI=UTF8}
+
+  function t(k,...a){const v=I[state.lang][k] ?? I.ja[k] ?? k;return typeof v==='function'?v(...a):v}
+  function applyI18n(){
+    document.documentElement.lang=state.lang;
+    $$('[data-i18n]').forEach(el=>{const k=el.dataset.i18n;if(I[state.lang][k]!==undefined)el.textContent=t(k)});
+    $$('[data-i18n-placeholder]').forEach(el=>el.placeholder=t(el.dataset.i18nPlaceholder));$$('[data-i18n-aria]').forEach(el=>el.setAttribute('aria-label',t(el.dataset.i18nAria)));if($('#searchInput'))$('#searchInput').placeholder=t('searchHint');
+    $('#langBtn').textContent=state.lang==='ja'?'EN':'JA';
+    $('#helpBtn').setAttribute('aria-label',t('helpTitle'));
+    renderAll();
+  }
+  function icon(kind){
+    const paths={
+      folder:'<path d="M3.5 7h6l2 2h9v10h-17z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>',
+      chevron:'<path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>',
+      image:'<rect x="4" y="5" width="16" height="14" rx="2" stroke="currentColor" stroke-width="1.7"/><circle cx="9" cy="10" r="1.5" stroke="currentColor" stroke-width="1.5"/><path d="m6 17 4-4 3 3 2-2 3 3" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>',
+      text:'<path d="M6 3.5h8l4 4V20H6zM14 3.5V8h4M9 12h6M9 15h6" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/>',
+      code:'<path d="m9 8-4 4 4 4M15 8l4 4-4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
+      archive:'<path d="M5 6h14v14H5zM7 3.5h10V6M12 8v8M10 10h4M10 13h4" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/>',
+      pdf:'<path d="M6 3.5h8l4 4V20H6zM14 3.5V8h4M8.5 15.5h7" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/>',
+      other:'<path d="M6 3.5h8l4 4V20H6zM14 3.5V8h4" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>',
+      warn:'<path d="m12 3 9 17H3zM12 9v4M12 16h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
+      ok:'<circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="m8 12 2.5 2.5L16.5 9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>'
+    };
+    return `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true">${paths[kind]||paths.other}</svg>`
+  }
+  function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+  function fmtBytes(n){if(!Number.isFinite(n))return '-';if(n===0)return '0 B';const u=['B','KB','MB','GB','TB'];const i=Math.min(u.length-1,Math.floor(Math.log(n)/Math.log(1024)));const v=n/Math.pow(1024,i);return `${v>=100||i===0?v.toFixed(0):v>=10?v.toFixed(1):v.toFixed(2)} ${u[i]}`}
+  function ratio(entry){if(!entry.compressedSize||entry.size<=entry.compressedSize)return entry.compressedSize===entry.size?0:null;return 1-entry.compressedSize/entry.size}
+  function fmtRatio(v){return v==null?'-':`${Math.max(0,v*100).toFixed(v>.995?2:1)}%`}
+  function setPhase(key,progress=null){state.phase=key||'';const text=$('#phaseText'),track=$('#phaseTrack'),fill=$('#phaseFill');if(!text)return;text.textContent=key?t(key):'';track.classList.toggle('hidden',progress==null);if(progress!=null)fill.style.width=`${Math.max(0,Math.min(100,progress))}%`}
+  function parseSizeValue(v){const m=String(v||'').trim().match(/^([0-9]+(?:\.[0-9]+)?)\s*(b|kb|mb|gb)?$/i);if(!m)return null;const mult={b:1,kb:1024,mb:1048576,gb:1073741824}[(m[2]||'b').toLowerCase()]||1;return Number(m[1])*mult}
+  function cleanPath(p){return p.replace(/\\/g,'/').replace(/^\.\/+/,'')}
+  function basename(p){const a=cleanPath(p).split('/').filter(Boolean);return a[a.length-1]||''}
+  function dirname(p){const a=cleanPath(p).split('/');a.pop();return a.join('/').replace(/\/+$/,'')}
+  function extOf(p){const b=basename(p).toLowerCase();const i=b.lastIndexOf('.');return i>0?b.slice(i+1):''}
+  function classify(p){
+    const e=extOf(p);
+    if(['png','jpg','jpeg','gif','webp','bmp','avif','ico'].includes(e))return'image';
+    if(['txt','md','markdown','csv','tsv','json','xml','yaml','yml','ini','log','toml','properties'].includes(e))return'text';
+    if(['js','mjs','cjs','ts','tsx','jsx','html','htm','css','scss','less','py','rb','php','java','kt','kts','c','h','cpp','hpp','cs','go','rs','sh','bash','zsh','ps1','bat','cmd','sql','vue','svelte'].includes(e))return'code';
+    if(['zip','7z','rar','tar','gz','tgz','bz2','xz','cab','iso','lzh','lha','jar','war','apk','epub'].includes(e))return'archive';
+    if(e==='pdf')return'pdf';
+    return'other';
+  }
+  function methodName(e){if(e.source==='tar')return'Stored (TAR)';if(e.source==='gzip')return'GZIP';if(e.source==='cab')return e.method===0?'Stored (CAB)':`CAB method ${e.method}`;if(e.source==='iso')return'Stored (ISO 9660)';if(e.source==='lzh')return e.method==='-lh0-'?'Stored (LZH)':String(e.method||'LZH');if(e.source==='rar')return e.method===0?'Stored (RAR)':`RAR method ${e.method}`;if(e.source==='7z')return String(e.method||'7z');return e.method===0?'Stored':e.method===8?'Deflate':`ZIP method ${e.method}`}
+  function dosDate(time,date){
+    if(!time&&!date)return null;
+    const y=((date>>9)&127)+1980,m=(date>>5)&15,d=date&31,h=(time>>11)&31,mi=(time>>5)&63,s=(time&31)*2;
+    const dt=new Date(y,m-1,d,h,mi,s);return Number.isNaN(dt.getTime())?null:dt
+  }
+  function readU16(v,o){return v.getUint16(o,true)} function readU32(v,o){return v.getUint32(o,true)}
+  const CRC32_TABLE=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=(c>>>1)^((c&1)?0xedb88320:0);t[n]=c>>>0}return t})();
+  function crc32(bytes){let c=0xffffffff;for(let i=0;i<bytes.length;i++)c=(c>>>8)^CRC32_TABLE[(c^bytes[i])&255];return(c^0xffffffff)>>>0}
+  function zipCrcUpdate(c,b){return((c>>>8)^CRC32_TABLE[(c^b)&255])>>>0}
+  function badPasswordError(){const e=new Error('Wrong archive password');e.code='BAD_PASSWORD';return e}
+  function passwordCancelledError(){const e=new Error('Password cancelled');e.code='PASSWORD_CANCELLED';return e}
+  function unsupportedEncryptionError(){const e=new Error('Unsupported archive encryption');e.code='UNSUPPORTED_ENCRYPTION';return e}
+  function decryptZipCrypto(data,password,checkByte){
+    if(data.length<12)throw badPasswordError();let k0=0x12345678,k1=0x23456789,k2=0x34567890;
+    const update=b=>{k0=zipCrcUpdate(k0,b);k1=(Math.imul((k1+(k0&255))>>>0,134775813)+1)>>>0;k2=zipCrcUpdate(k2,k1>>>24)};
+    for(const b of new TextEncoder().encode(password))update(b);
+    const decByte=b=>{const x=(k2|2)>>>0,d=(Math.imul(x,(x^1)>>>0)>>>8)&255,out=b^d;update(out);return out};
+    const header=new Uint8Array(12);for(let i=0;i<12;i++)header[i]=decByte(data[i]);if(header[11]!==checkByte)throw badPasswordError();
+    const out=new Uint8Array(data.length-12);for(let i=12;i<data.length;i++)out[i-12]=decByte(data[i]);return out
+  }
+  async function streamDecompress(blob,format){
+    if(typeof DecompressionStream!=='function')throw new Error('DecompressionStream unavailable');
+    const out=blob.stream().pipeThrough(new DecompressionStream(format));
+    return new Uint8Array(await new Response(out).arrayBuffer())
+  }
+  function findEOCD(view){
+    const min=Math.max(0,view.byteLength-65557);
+    for(let i=view.byteLength-22;i>=min;i--)if(readU32(view,i)===0x06054b50)return i;
+    return -1
+  }
+  function decodeZipName(nameBytes,extraBytes,utf8){
+    let p=0;
+    while(p+4<=extraBytes.length){
+      const id=extraBytes[p]|(extraBytes[p+1]<<8),len=extraBytes[p+2]|(extraBytes[p+3]<<8);
+      if(id===0x7075&&len>=5&&p+4+len<=extraBytes.length){
+        try{return UTF8.decode(extraBytes.slice(p+9,p+4+len))}catch{}
+      }
+      p+=4+len;
+    }
+    if(utf8)return UTF8.decode(nameBytes);try{const guess=UTF8_FATAL.decode(nameBytes);if(/[^\x00-\x7f]/.test(guess))return guess}catch{}return ANSI.decode(nameBytes)
+  }
+  function zipAesInfo(extraBytes){let p=0;while(p+4<=extraBytes.length){const id=extraBytes[p]|(extraBytes[p+1]<<8),len=extraBytes[p+2]|(extraBytes[p+3]<<8),end=p+4+len;if(end>extraBytes.length)break;if(id===0x9901&&len>=7){return{version:extraBytes[p+4]|(extraBytes[p+5]<<8),vendor:String.fromCharCode(extraBytes[p+6],extraBytes[p+7]),strength:extraBytes[p+8],method:extraBytes[p+9]|(extraBytes[p+10]<<8)}}p=end}return null}
+
+  async function parseZip(file,gen){
+    const buf=await file.arrayBuffer(); if(gen!==state.generation)throw new Error('stale');
+    const v=new DataView(buf),u=new Uint8Array(buf),eocd=findEOCD(v);
+    if(eocd<0)throw new Error('EOCD not found');
+    const total=readU16(v,eocd+10),cdSize=readU32(v,eocd+12),cdOffset=readU32(v,eocd+16);
+    if(total===0xffff||cdSize===0xffffffff||cdOffset===0xffffffff)showToast(t('unsupportedZip64'));
+    let p=cdOffset,entries=[];
+    for(let i=0;i<total&&p+46<=v.byteLength;i++){
+      if(i%400===0){setPhase('phaseList',total?i/total*100:20);await new Promise(r=>setTimeout(r,0));if(gen!==state.generation)throw new Error('stale')}
+      if(readU32(v,p)!==0x02014b50)break;
+      const flags=readU16(v,p+8),method=readU16(v,p+10),time=readU16(v,p+12),date=readU16(v,p+14),crc=readU32(v,p+16),comp=readU32(v,p+20),size=readU32(v,p+24);
+      const nl=readU16(v,p+28),xl=readU16(v,p+30),cl=readU16(v,p+32),external=readU32(v,p+38),local=readU32(v,p+42);
+      const nb=u.slice(p+46,p+46+nl),xb=u.slice(p+46+nl,p+46+nl+xl);
+      let path=cleanPath(decodeZipName(nb,xb,!!(flags&0x800)));
+      const isDir=path.endsWith('/')||!!(external&0x10);
+      path=path.replace(/\/+$/,'');
+      const aes=zipAesInfo(xb),encrypted=!!(flags&1),actualMethod=aes?.method??method,passwordSupported=encrypted&&!aes&&[0,8].includes(actualMethod),unsupported=!isDir&&(![0,8].includes(actualMethod)||!!aes);
+      const entry={path,name:basename(path),dir:isDir,size:isDir?0:size,compressedSize:isDir?0:comp,method:actualMethod,modified:dosDate(time,date),crc32:crc,encrypted,localOffset:local,flags,source:'zip',unsupported,passwordSupported,encryptionScheme:encrypted?(aes?'aes':'zipcrypto'):null,zipBuffer:buf};
+      entry.getData=async(password)=>{
+        if(entry.dir)return new Uint8Array();if(entry.unsupported)throw entry.encrypted?unsupportedEncryptionError():new Error('Unsupported ZIP method');
+        const vv=new DataView(entry.zipBuffer);if(readU32(vv,entry.localOffset)!==0x04034b50)throw new Error('Invalid local header');
+        const nll=readU16(vv,entry.localOffset+26),xll=readU16(vv,entry.localOffset+28),start=entry.localOffset+30+nll+xll;let packed=new Uint8Array(entry.zipBuffer.slice(start,start+entry.compressedSize));
+        if(entry.encrypted){if(!entry.passwordSupported)throw unsupportedEncryptionError();if(typeof password!=='string')throw badPasswordError();const check=(entry.flags&8)?((time>>>8)&255):((entry.crc32>>>24)&255);packed=decryptZipCrypto(packed,password,check)}
+        let out;if(entry.method===0)out=packed;else out=await streamDecompress(new Blob([packed]),'deflate-raw');
+        if(entry.encrypted&&((out.length!==entry.size)||(crc32(out)!==(entry.crc32>>>0))))throw badPasswordError();return out
+      };
+      entry.getDataRange=async(start=0,end=entry.size,password)=>{if(entry.dir)return new Uint8Array();if(entry.encrypted||entry.method!==0)return(await entry.getData(password)).slice(start,end);if(entry.unsupported)throw new Error('Unsupported ZIP method');const vv=new DataView(entry.zipBuffer);if(readU32(vv,entry.localOffset)!==0x04034b50)throw new Error('Invalid local header');const nll=readU16(vv,entry.localOffset+26),xll=readU16(vv,entry.localOffset+28),dataStart=entry.localOffset+30+nll+xll;return new Uint8Array(entry.zipBuffer.slice(dataStart+start,dataStart+Math.min(end,entry.size)))};
+      entries.push(entry);p+=46+nl+xl+cl;
+    }
+    setPhase('phaseList',100);return entries;
+  }
+  async function parseTarBytes(bytes,gen){
+    const entries=[];let o=0;
+    const text=(s,e)=>UTF8.decode(bytes.slice(s,e)).replace(/\0.*$/,'');
+    const oct=s=>{const x=s.replace(/\0.*$/,'').trim();return x?parseInt(x,8)||0:0};
+    let count=0;while(o+512<=bytes.length){
+      if(count++%400===0){setPhase('phaseList',Math.min(99,o/Math.max(1,bytes.length)*100));await new Promise(r=>setTimeout(r,0));if(gen!==state.generation)throw new Error('stale')}
+      let empty=true;for(let i=0;i<512;i++){if(bytes[o+i]!==0){empty=false;break}} if(empty)break;
+      const name=text(o,o+100),prefix=text(o+345,o+500),path=cleanPath((prefix?prefix+'/':'')+name).replace(/\/+$/,'');
+      const size=oct(text(o+124,o+136)),mtime=oct(text(o+136,o+148)),flag=String.fromCharCode(bytes[o+156]||48),isDir=flag==='5'||name.endsWith('/');
+      const start=o+512; const entry={path,name:basename(path),dir:isDir,size:isDir?0:size,compressedSize:isDir?0:size,method:0,modified:mtime?new Date(mtime*1000):null,crc32:null,encrypted:false,source:'tar',tarBytes:bytes,dataOffset:start};
+      entry.getDataRange=async(start=0,end=entry.size)=>entry.tarBytes.slice(entry.dataOffset+start,entry.dataOffset+Math.min(end,entry.size));entry.getData=async()=>entry.getDataRange(0,entry.size);
+      if(path)entries.push(entry); o=start+Math.ceil(size/512)*512;
+    }
+    setPhase('phaseList',100);return entries;
+  }
+  function isTar(bytes){return bytes.length>=512&&UTF8.decode(bytes.slice(257,262))==='ustar'}
+  async function parseTar(file,gen){const bytes=new Uint8Array(await file.arrayBuffer());if(gen!==state.generation)throw new Error('stale');return parseTarBytes(bytes,gen)}
+  async function parseGzip(file,gen){
+    const bytes=await streamDecompress(file,'gzip'); if(gen!==state.generation)throw new Error('stale');
+    if(isTar(bytes))return parseTarBytes(bytes,gen);
+    const outName=file.name.replace(/\.gz$/i,'')||'content';
+    const e={path:outName,name:outName,dir:false,size:bytes.length,compressedSize:file.size,method:8,modified:new Date(file.lastModified),crc32:crc32(bytes),encrypted:false,source:'gzip',gzipBytes:bytes};
+    e.getDataRange=async(start=0,end=e.size)=>e.gzipBytes.slice(start,Math.min(end,e.size));e.getData=async()=>e.gzipBytes; return[e]
+  }
+
+  function decodeBytes(bytes){try{return UTF8_FATAL.decode(bytes)}catch{}try{return new TextDecoder('shift-jis').decode(bytes)}catch{}return ANSI.decode(bytes)}
+  function readVint(bytes,pos){let value=0,shift=0;for(let i=0;i<10;i++){if(pos>=bytes.length)throw new Error('Invalid variable integer');const b=bytes[pos++];value+=(b&0x7f)*Math.pow(2,shift);if(!(b&0x80))return[value,pos];shift+=7}throw new Error('Variable integer too large')}
+  function fileDateFromDos(date,time){return dosDate(time,date)}
+  async function parseCab(file,gen){
+    const buf=await file.arrayBuffer();if(gen!==state.generation)throw new Error('stale');const u=new Uint8Array(buf),v=new DataView(buf);
+    if(u.length<36||String.fromCharCode(...u.slice(0,4))!=='MSCF')throw new Error('Invalid CAB');
+    const filesOffset=readU32(v,16),folderCount=readU16(v,26),fileCount=readU16(v,28);let p=36;const folders=[];
+    for(let i=0;i<folderCount;i++){if(p+8>u.length)throw new Error('Invalid CAB folder');folders.push({dataOffset:readU32(v,p),blocks:readU16(v,p+4),type:readU16(v,p+6)});p+=8}
+    p=filesOffset;const metas=[];
+    for(let i=0;i<fileCount;i++){if(p+16>u.length)break;const size=readU32(v,p),folderOffset=readU32(v,p+4),folderIndex=readU16(v,p+8),date=readU16(v,p+10),time=readU16(v,p+12),attrs=readU16(v,p+14);p+=16;let q=p;while(q<u.length&&u[q])q++;const raw=u.slice(p,q);let path=cleanPath(decodeBytes(raw));p=q+1;metas.push({path,size,folderOffset,folderIndex,date,time,attrs})}
+    const cache=new Map();async function folderData(index){if(cache.has(index))return cache.get(index);const f=folders[index];if(!f)throw new Error('Invalid CAB folder index');let q=f.dataOffset;const chunks=[];let total=0;const comp=f.type&0x000f;for(let i=0;i<f.blocks;i++){if(q+8>u.length)throw new Error('Invalid CAB data');const cbData=readU16(v,q+4),cbUncomp=readU16(v,q+6);q+=8;const data=u.slice(q,q+cbData);q+=cbData;if(comp!==0)throw new Error('Unsupported CAB compression');chunks.push(data);total+=cbUncomp}const out=new Uint8Array(total);let o=0;for(const c of chunks){out.set(c,o);o+=c.length}cache.set(index,out);return out}
+    return metas.map(m=>{const folder=folders[m.folderIndex],method=folder?(folder.type&0x000f):-1;const e={path:m.path,name:basename(m.path),dir:false,size:m.size,compressedSize:m.size,method,modified:fileDateFromDos(m.date,m.time),crc32:null,encrypted:false,source:'cab',unsupported:method!==0};e.getDataRange=async(start=0,end=e.size)=>{if(e.unsupported)throw new Error('Unsupported CAB compression');const data=await folderData(m.folderIndex);return data.slice(m.folderOffset+start,m.folderOffset+Math.min(end,e.size))};e.getData=async()=>e.getDataRange(0,e.size);return e})
+  }
+  function isoRecordDate(rec){if(rec.length<25)return null;const y=1900+rec[18],m=rec[19],d=rec[20],h=rec[21],mi=rec[22],se=rec[23];const dt=new Date(Date.UTC(y,m-1,d,h,mi,se));return Number.isNaN(dt.getTime())?null:dt}
+  function isoRockRidgeName(rec,nl){let p=33+nl+(nl%2?0:1);while(p+4<=rec.length){const sig=String.fromCharCode(rec[p],rec[p+1]),len=rec[p+2];if(len<4||p+len>rec.length)break;if(sig==='NM'&&len>=5){const flags=rec[p+4];if(!(flags&0x06))return decodeBytes(rec.slice(p+5,p+len))}p+=len}return''}
+  async function parseIso(file,gen){
+    const buf=await file.arrayBuffer();if(gen!==state.generation)throw new Error('stale');const u=new Uint8Array(buf),v=new DataView(buf),sector=2048,pvdOff=16*sector;if(u.length<pvdOff+sector||String.fromCharCode(...u.slice(pvdOff+1,pvdOff+6))!=='CD001')throw new Error('Invalid ISO 9660');
+    const rootLen=u[pvdOff+156];if(!rootLen)throw new Error('Missing ISO root');const root=u.slice(pvdOff+156,pvdOff+156+rootLen),rootExtent=readU32(new DataView(root.buffer,root.byteOffset,root.byteLength),2),rootSize=readU32(new DataView(root.buffer,root.byteOffset,root.byteLength),10);const entries=[],seen=new Set();
+    const walk=(extent,size,prefix,depth)=>{if(depth>20)return;const key=extent+':'+size;if(seen.has(key))return;seen.add(key);const start=extent*sector,end=Math.min(u.length,start+size);let o=start;while(o<end){const rel=o-start,ln=u[o];if(!ln){o=start+(Math.floor(rel/sector)+1)*sector;continue}if(o+ln>end||ln<34)break;const rec=u.slice(o,o+ln),rv=new DataView(rec.buffer,rec.byteOffset,rec.byteLength),ex=readU32(rv,2),sz=readU32(rv,10),flags=rec[25],nl=rec[32],raw=rec.slice(33,33+nl);o+=ln;if(raw.length===1&&(raw[0]===0||raw[0]===1))continue;let name=isoRockRidgeName(rec,nl);if(!name)name=decodeBytes(raw).replace(/;[0-9]+$/,'');if(!name)continue;const path=cleanPath(prefix+name),dir=!!(flags&2),modified=isoRecordDate(rec);const e={path,name:basename(path),dir,size:dir?0:sz,compressedSize:dir?0:sz,method:0,modified,crc32:null,encrypted:false,source:'iso',isoBuffer:buf,dataOffset:ex*sector};e.getDataRange=async(start=0,end=e.size)=>new Uint8Array(e.isoBuffer.slice(e.dataOffset+start,e.dataOffset+Math.min(end,e.size)));e.getData=async()=>e.getDataRange(0,e.size);entries.push(e);if(dir)walk(ex,sz,path+'/',depth+1)}};
+    walk(rootExtent,rootSize,'',0);return entries
+  }
+  async function parseLzh(file,gen){
+    const buf=await file.arrayBuffer();if(gen!==state.generation)throw new Error('stale');const u=new Uint8Array(buf),v=new DataView(buf),entries=[];let p=0,count=0;
+    while(p<u.length&&u[p]){if(++count>100000)throw new Error('Too many LZH entries');const hs=u[p];if(hs<22||p+2+hs>u.length)break;const method=String.fromCharCode(...u.slice(p+2,p+7)),packed=readU32(v,p+7),size=readU32(v,p+11),level=u[p+20];if(level!==0)throw new Error('Unsupported LZH header level');const nl=u[p+21],nameStart=p+22;if(nameStart+nl>p+2+hs)throw new Error('Invalid LZH name');const path=cleanPath(decodeBytes(u.slice(nameStart,nameStart+nl))),dataOffset=p+2+hs;const unsupported=method!=='-lh0-';const e={path,name:basename(path),dir:false,size,compressedSize:packed,method,modified:null,crc32:null,encrypted:false,source:'lzh',unsupported,lzhBuffer:buf,dataOffset};e.getDataRange=async(start=0,end=e.size)=>{if(e.unsupported)throw new Error('Unsupported LZH compression');return new Uint8Array(e.lzhBuffer.slice(e.dataOffset+start,e.dataOffset+Math.min(end,e.compressedSize)))};e.getData=async()=>e.getDataRange(0,e.size);if(path)entries.push(e);p=dataOffset+packed}
+    return entries
+  }
+  async function parseRar(file,gen){
+    const buf=await file.arrayBuffer();if(gen!==state.generation)throw new Error('stale');const u=new Uint8Array(buf),v=new DataView(buf);if(u.length<8||String.fromCharCode(...u.slice(0,4))!=='Rar!')throw new Error('Invalid RAR');if(!(u[6]===1&&u[7]===0))throw new Error('Unsupported RAR version');let p=8;const entries=[];
+    while(p<u.length){if(p+5>u.length)break;const blockStart=p;p+=4;let r=readVint(u,p),headerSize=r[0];p=r[1];const headerStart=p;r=readVint(u,p);const type=r[0];p=r[1];r=readVint(u,p);const flags=r[0];p=r[1];let extraSize=0,dataSize=0;if(flags&1){r=readVint(u,p);extraSize=r[0];p=r[1]}if(flags&2){r=readVint(u,p);dataSize=r[0];p=r[1]}const headerEnd=headerStart+headerSize;if(headerEnd>u.length)throw new Error('Invalid RAR header');if(type===2){r=readVint(u,p);const fileFlags=r[0];p=r[1];r=readVint(u,p);const size=r[0];p=r[1];r=readVint(u,p);const attrs=r[0];p=r[1];let modified=null,crc=null;if(fileFlags&2){if(p+4>headerEnd)throw new Error('Invalid RAR time');modified=new Date(readU32(v,p)*1000);p+=4}if(fileFlags&4){crc=readU32(v,p);p+=4}r=readVint(u,p);const compInfo=r[0];p=r[1];r=readVint(u,p);p=r[1];r=readVint(u,p);const nl=r[0];p=r[1];if(p+nl>headerEnd)throw new Error('Invalid RAR name');const path=cleanPath(UTF8.decode(u.slice(p,p+nl)));p+=nl;const method=Math.floor(compInfo/128)&7,dir=!!(fileFlags&1),unsupported=!dir&&method!==0;const e={path,name:basename(path),dir,size:dir?0:size,compressedSize:dir?0:dataSize,method,modified,crc32:crc,encrypted:false,source:'rar',unsupported,rarBuffer:buf,dataOffset:headerEnd};e.getDataRange=async(start=0,end=e.size)=>{if(e.unsupported)throw new Error('Unsupported RAR compression');return new Uint8Array(e.rarBuffer.slice(e.dataOffset+start,e.dataOffset+Math.min(end,e.compressedSize)))};e.getData=async()=>e.getDataRange(0,e.size);if(path)entries.push(e)}p=headerEnd+dataSize;if(type===5)break;if(p<=blockStart)throw new Error('Invalid RAR block')}
+    return entries
+  }
+
+  function sevenNum(bytes,pos){const first=bytes[pos++];if(first==null)throw new Error('Invalid 7z number');let mask=0x80,value=0;for(let i=0;i<8;i++){if(!(first&mask)){value+=(first&(mask-1))*Math.pow(2,8*i);if(!Number.isSafeInteger(value))throw new Error('7z value too large');return[value,pos]}if(pos>=bytes.length)throw new Error('Invalid 7z number');value+=bytes[pos++]*Math.pow(2,8*i);mask>>=1}if(!Number.isSafeInteger(value))throw new Error('7z value too large');return[value,pos]}
+  function sevenBits(bytes,count){const out=[];for(let i=0;i<count;i++)out.push(!!(bytes[Math.floor(i/8)]&(0x80>>(i%8))));return out}
+  function lzmaDecode7z(packed,props,unpackSize){if(unpackSize>256*1024*1024)throw new Error('Unsupported 7z size');if(!globalThis.LZMA?.decompress)throw new Error('LZMA decoder unavailable');const input=new Uint8Array(13+packed.length);input.set(props,0);let n=unpackSize;for(let i=0;i<8;i++){input[5+i]=n%256;n=Math.floor(n/256)}input.set(packed,13);const raw=globalThis.LZMA.decompress(Array.from(input));if(typeof raw==='string')return new TextEncoder().encode(raw);return Uint8Array.from(raw,x=>x&255)}
+  function parse7zFolder(bytes,pos){let r=sevenNum(bytes,pos),numCoders=r[0],coders=[],totalIn=0,totalOut=0;pos=r[1];for(let i=0;i<numCoders;i++){const flags=bytes[pos++],idSize=flags&0x0f;if(flags&0x80)throw new Error('Alternative 7z methods unsupported');const method=bytes.slice(pos,pos+idSize);pos+=idSize;let inputs=1,outputs=1;if(flags&0x10){r=sevenNum(bytes,pos);inputs=r[0];pos=r[1];r=sevenNum(bytes,pos);outputs=r[0];pos=r[1]}let props=new Uint8Array();if(flags&0x20){r=sevenNum(bytes,pos);const len=r[0];pos=r[1];props=bytes.slice(pos,pos+len);pos+=len}coders.push({method,inputs,outputs,props});totalIn+=inputs;totalOut+=outputs}const binds=[];for(let i=0;i<totalOut-1;i++){r=sevenNum(bytes,pos);const inIndex=r[0];pos=r[1];r=sevenNum(bytes,pos);const outIndex=r[0];pos=r[1];binds.push({inIndex,outIndex})}const packedIndices=[];const packedStreams=totalIn-totalOut+1;if(packedStreams>1){for(let i=0;i<packedStreams;i++){r=sevenNum(bytes,pos);packedIndices.push(r[0]);pos=r[1]}}return[{coders,totalIn,totalOut,binds,packedIndices},pos]}
+  function parse7zStreams(bytes,start=0){let pos=start,packPos=0,packSizes=[],folders=[],numSubs=[],subSizes=[],subCrcs=[];while(pos<bytes.length){const id=bytes[pos++];if(id===0)break;if(id===6){let r=sevenNum(bytes,pos);packPos=r[0];pos=r[1];r=sevenNum(bytes,pos);const count=r[0];pos=r[1];while(pos<bytes.length){const pid=bytes[pos++];if(pid===0)break;if(pid===9){packSizes=[];for(let i=0;i<count;i++){r=sevenNum(bytes,pos);packSizes.push(r[0]);pos=r[1]}}else if(pid===10){const all=bytes[pos++];let defs=Array(count).fill(true);if(!all){const nb=Math.ceil(count/8);defs=sevenBits(bytes.slice(pos,pos+nb),count);pos+=nb}for(const d of defs)if(d)pos+=4}else throw new Error('Unsupported 7z PackInfo')}}else if(id===7){if(bytes[pos++]!==11)throw new Error('Invalid 7z Folder');let r=sevenNum(bytes,pos);const count=r[0];pos=r[1];if(bytes[pos++]!==0)throw new Error('External 7z folders unsupported');folders=[];for(let i=0;i<count;i++){let f;[f,pos]=parse7zFolder(bytes,pos);folders.push(f)}if(bytes[pos++]!==12)throw new Error('Missing 7z unpack sizes');for(const f of folders){f.unpackSizes=[];for(let i=0;i<f.totalOut;i++){r=sevenNum(bytes,pos);f.unpackSizes.push(r[0]);pos=r[1]}}if(bytes[pos]===10){pos++;const all=bytes[pos++];let defs=Array(folders.length).fill(true);if(!all){const nb=Math.ceil(folders.length/8);defs=sevenBits(bytes.slice(pos,pos+nb),folders.length);pos+=nb}folders.forEach((f,i)=>{if(defs[i]){f.crc32=new DataView(bytes.buffer,bytes.byteOffset+pos,4).getUint32(0,true);pos+=4}})}if(bytes[pos++]!==0)throw new Error('Invalid 7z UnpackInfo end')}else if(id===8){numSubs=folders.map(()=>1);while(pos<bytes.length){const sid=bytes[pos++];if(sid===0)break;if(sid===13){numSubs=[];for(let i=0;i<folders.length;i++){let r=sevenNum(bytes,pos);numSubs.push(r[0]);pos=r[1]}}else if(sid===9){subSizes=[];for(let fi=0;fi<folders.length;fi++){const arr=[];let sum=0;for(let i=0;i<numSubs[fi]-1;i++){let r=sevenNum(bytes,pos);arr.push(r[0]);sum+=r[0];pos=r[1]}arr.push(folders[fi].unpackSizes.at(-1)-sum);subSizes.push(arr)}}else if(sid===10){const digestCount=numSubs.reduce((a,b)=>a+b,0)-folders.reduce((a,f,i)=>a+(numSubs[i]===1&&f.crc32!=null?1:0),0);const all=bytes[pos++];let defs=Array(digestCount).fill(true);if(!all){const nb=Math.ceil(digestCount/8);defs=sevenBits(bytes.slice(pos,pos+nb),digestCount);pos+=nb}const vals=[];for(const d of defs){if(d){vals.push(new DataView(bytes.buffer,bytes.byteOffset+pos,4).getUint32(0,true));pos+=4}else vals.push(null)}subCrcs=vals}else throw new Error('Unsupported 7z SubStreamsInfo')}}else throw new Error('Unsupported 7z StreamsInfo')}return{pos,packPos,packSizes,folders,numSubs:numSubs.length?numSubs:folders.map(()=>1),subSizes,subCrcs}}
+  function parse7zTimes(data,count){let pos=0,defs=Array(count).fill(true);const all=data[pos++];if(!all){const nb=Math.ceil(count/8);defs=sevenBits(data.slice(pos,pos+nb),count);pos+=nb}const external=data[pos++];if(external)throw new Error('External 7z times unsupported');const out=Array(count).fill(null);for(let i=0;i<count;i++)if(defs[i]){let lo=0,hi=0;for(let j=0;j<4;j++)lo+=data[pos+j]*Math.pow(2,8*j);for(let j=0;j<4;j++)hi+=data[pos+4+j]*Math.pow(2,8*j);pos+=8;const ticks=hi*4294967296+lo;const ms=ticks/10000-11644473600000;out[i]=Number.isFinite(ms)?new Date(ms):null}return out}
+  function is7zAesCoder(c){return !!c&&c.method?.length===4&&c.method[0]===6&&c.method[1]===0xf1&&c.method[2]===7&&c.method[3]===1}
+  function parse7zFiles(bytes,pos,streams,archiveBuf){if(bytes[pos++]!==5)throw new Error('Missing 7z FilesInfo');let r=sevenNum(bytes,pos),count=r[0],names=Array(count).fill(''),empty=Array(count).fill(false),emptyFile=[],mtimes=Array(count).fill(null);pos=r[1];while(pos<bytes.length){const id=bytes[pos++];if(id===0)break;r=sevenNum(bytes,pos);const len=r[0];pos=r[1];const data=bytes.slice(pos,pos+len);pos+=len;if(id===14)empty=sevenBits(data,count);else if(id===15)emptyFile=sevenBits(data,empty.filter(Boolean).length);else if(id===17){if(data[0])throw new Error('External 7z names unsupported');const text=new TextDecoder('utf-16le').decode(data.slice(1));const parts=text.split('\0');for(let i=0;i<count;i++)names[i]=parts[i]||''}else if(id===20){try{mtimes=parse7zTimes(data,count)}catch{}}}
+    if(streams.folders.length!==1||streams.packSizes.length!==1)throw new Error('Multi-folder 7z unsupported');const f=streams.folders[0],coder=f.coders[0];if(f.coders.some(is7zAesCoder))throw unsupportedEncryptionError();if(f.coders.length!==1||f.totalIn!==1||f.totalOut!==1||coder.method.length!==3||coder.method[0]!==3||coder.method[1]!==1||coder.method[2]!==1)throw new Error('Only LZMA 7z streams are supported');const unpackTotal=f.unpackSizes[0],sub=streams.subSizes[0]||[unpackTotal],packSize=streams.packSizes[0],packStart=32+streams.packPos;let cache=null;const getSolid=()=>{if(cache)return cache;const packed=new Uint8Array(archiveBuf.slice(packStart,packStart+packSize));cache=lzmaDecode7z(packed,coder.props,unpackTotal);return cache};let si=0,off=0,ei=0;const entries=[];for(let i=0;i<count;i++){const path=cleanPath(names[i]);if(!path)continue;if(empty[i]){const isFile=emptyFile[ei++]||false;const e={path,name:basename(path),dir:!isFile,size:0,compressedSize:0,method:'LZMA',modified:mtimes[i],crc32:null,encrypted:false,source:'7z',unsupported:false};e.getDataRange=async()=>new Uint8Array();e.getData=async()=>new Uint8Array();entries.push(e);continue}const size=sub[si]??0,entryOff=off,crc=streams.subCrcs[si]??null;si++;off+=size;const approx=unpackTotal?Math.round(packSize*size/unpackTotal):size;const e={path,name:basename(path),dir:false,size,compressedSize:approx,method:'LZMA',modified:mtimes[i],crc32:crc,encrypted:false,source:'7z',unsupported:false};e.getDataRange=async(start=0,end=e.size)=>getSolid().slice(entryOff+start,entryOff+Math.min(end,e.size));e.getData=async()=>e.getDataRange(0,e.size);entries.push(e)}return entries}
+  async function parse7z(file,gen){const buf=await file.arrayBuffer();if(gen!==state.generation)throw new Error('stale');const u=new Uint8Array(buf);if(u.length<32||u[0]!==0x37||u[1]!==0x7a||u[2]!==0xbc||u[3]!==0xaf||u[4]!==0x27||u[5]!==0x1c)throw new Error('Invalid 7z');const dv=new DataView(buf);const u64=o=>{const lo=dv.getUint32(o,true),hi=dv.getUint32(o+4,true),n=hi*4294967296+lo;if(!Number.isSafeInteger(n))throw new Error('7z offset too large');return n};const nextOff=u64(12),nextSize=u64(20),start=32+nextOff;if(start+nextSize>u.length)throw new Error('Invalid 7z next header');let header=u.slice(start,start+nextSize);if(header[0]===23){const enc=parse7zStreams(header,1);if(enc.folders.length!==1||enc.packSizes.length!==1)throw new Error('Unsupported encoded 7z header');const f=enc.folders[0],c=f.coders[0];if(f.coders.some(is7zAesCoder))throw unsupportedEncryptionError();if(f.coders.length!==1||c.method.length!==3||c.method[0]!==3||c.method[1]!==1||c.method[2]!==1)throw new Error('Only LZMA encoded 7z headers are supported');const packed=u.slice(32+enc.packPos,32+enc.packPos+enc.packSizes[0]);header=lzmaDecode7z(packed,c.props,f.unpackSizes[0])}if(header[0]!==1)throw new Error('Invalid 7z header');let pos=1,streams=null;if(header[pos]===4){streams=parse7zStreams(header,pos+1);pos=streams.pos}if(!streams)throw new Error('7z without streams unsupported');return parse7zFiles(header,pos,streams,buf)}
+  async function sniff(file){
+    const h=new Uint8Array(await file.slice(0,0x9000).arrayBuffer());
+    if(h[0]===0x50&&h[1]===0x4b)return'zip';
+    if(h[0]===0x1f&&h[1]===0x8b)return'gzip';
+    if(h[0]===0x37&&h[1]===0x7a&&h[2]===0xbc&&h[3]===0xaf&&h[4]===0x27&&h[5]===0x1c)return'7z';
+    if(h[0]===0x52&&h[1]===0x61&&h[2]===0x72&&h[3]===0x21)return'rar';
+    if(h[0]===0x4d&&h[1]===0x53&&h[2]===0x43&&h[3]===0x46)return'cab';
+    if(h.length>0x8006&&String.fromCharCode(...h.slice(0x8001,0x8006))==='CD001')return'iso';
+    if(h.length>=7&&String.fromCharCode(...h.slice(2,7)).match(/^-lh[0-9a-z]-$/i))return'lzh';
+    if(isTar(h))return'tar';
+    const n=file.name.toLowerCase(); if(n.endsWith('.tar'))return'tar'; if(n.endsWith('.gz')||n.endsWith('.tgz'))return'gzip'; if(n.endsWith('.zip'))return'zip';if(n.endsWith('.cab'))return'cab';if(n.endsWith('.iso'))return'iso';if(n.endsWith('.lzh')||n.endsWith('.lha'))return'lzh';if(n.endsWith('.rar'))return'rar';if(n.endsWith('.7z'))return'7z';
+    return'unsupported'
+  }
+
+
+  function archiveSnapshot(){return{file:state.file,type:state.type,entries:state.entries,cwd:state.cwd,active:state.active,selected:new Set(state.selected),expandedFolders:new Set(state.expandedFolders),search:state.search,typeFilter:state.typeFilter,warnings:state.warnings,duplicates:state.duplicates,sortKey:state.sortKey,sortDir:state.sortDir,filterMin:state.filterMin,filterMax:state.filterMax,encryptedOnly:state.encryptedOnly,warningOnly:state.warningOnly,analysisPath:state.analysisPath,archivePassword:state.archivePassword}}
+  function applySnapshot(snap){revokePreview();Object.assign(state,snap);state.selected=new Set(snap.selected);state.expandedFolders=new Set(snap.expandedFolders);state.virtualItems=[];state.virtualized=false;state.listContextKey='';state.virtualStart=-1;$('#searchInput').value=state.search;$('#typeFilter').value=state.typeFilter;syncFilterInputs();$('#archiveName').textContent=state.file.name;$('#archiveMeta').textContent=archiveMetaText();renderCapability();$('#appView').classList.remove('hidden');$('#emptyView').classList.add('hidden');$('#mobileBar').classList.remove('hidden');setPhase('phaseReady');renderAll();updateArchiveBack()}
+  function restoreArchiveLevel(index){const snap=state.archiveStack[index];if(!snap)return;state.archiveStack=state.archiveStack.slice(0,index);applySnapshot(snap)}
+  function updateArchiveBack(){$('#backArchiveBtn').classList.toggle('hidden',state.archiveStack.length===0)}
+  function archiveMetaText(){if(!state.file)return'';const labels={cab:'CAB',iso:'ISO 9660',lzh:'LZH',rar:'RAR5',zip:'ZIP',tar:'TAR','7z':'7z (LZMA)'};const label=state.type==='gzip'?(state.entries.some(e=>e.source==='tar')?'TAR.GZ / TGZ':'GZIP'):(labels[state.type]||state.type.toUpperCase());return`${label} · ${fmtBytes(state.file.size)}`}
+  function canExtractEntry(e){return !!e&&!e.dir&&!e.unsupported&&(!e.encrypted||!!e.passwordSupported)&&typeof e.getData==='function'}
+  function extractionBlockReason(e){if(!e)return'';if(e.encrypted&&!e.passwordSupported)return e.encryptionScheme==='aes'?t('aesUnsupported'):t('cannotExtractEncrypted');if(e.unsupported)return t('cannotExtractMethod');return''}
+  function capabilityInfo(){const files=state.entries.filter(e=>!e.dir),unsupported=files.filter(e=>e.unsupported&&!e.encrypted).length,encrypted=files.filter(e=>e.encrypted).length,encryptedSupported=files.filter(e=>e.encrypted&&e.passwordSupported).length,encryptedUnsupported=files.filter(e=>e.encrypted&&!e.passwordSupported).length,ok=files.filter(canExtractEntry).length,total=files.length;return{unsupported,encrypted,encryptedSupported,encryptedUnsupported,ok,total}}
+  function renderCapability(){const host=$('#archiveCapability');if(!host)return;if(!state.file||!state.entries.length){host.classList.add('hidden');host.innerHTML='';return}const c=capabilityInfo();let tone='ok',label=t('capAll');if(c.total&&c.ok===0){tone='blocked';label=t('capListOnly')}else if(c.ok<c.total){tone='partial';label=t('capPartial',c.ok,c.total)}const details=[];if(c.unsupported)details.push(t('capUnsupported',c.unsupported));if(c.encryptedSupported)details.push(state.archivePassword?t('capUnlocked',c.encryptedSupported):t('capPassword',c.encryptedSupported));if(c.encryptedUnsupported)details.push(t('capEncryptedUnsupported',c.encryptedUnsupported));host.innerHTML=`<span class="cap-pill ${tone}">${esc(label)}</span>${details.length?`<span class="cap-detail">${esc(details.join(' · '))}</span>`:''}`;host.classList.remove('hidden')}
+  function resetPasswordDialog(){const d=$('#passwordDialog');if(!d)return;$('#archivePassword').value='';$('#archivePassword').type='password';$('#passwordError').textContent='';$('#passwordError').classList.add('hidden');$('#passwordToggle').setAttribute('aria-label',t('showPassword'))}
+  function requestArchivePassword(e,{retry=false}={}){if(state.archivePassword&&!retry)return Promise.resolve(state.archivePassword);if(state.passwordPending)return state.passwordPending;const d=$('#passwordDialog');resetPasswordDialog();state.passwordEntry=e;$('#passwordTarget').textContent=t('passwordFor',e?.name||state.file?.name||'archive');if(retry){$('#passwordError').textContent=t('wrongPassword');$('#passwordError').classList.remove('hidden')}d.showModal();setTimeout(()=>$('#archivePassword').focus(),0);state.passwordPending=new Promise(resolve=>{state._passwordResolve=resolve});return state.passwordPending}
+  function finishPasswordDialog(value){const d=$('#passwordDialog');if(d.open)d.close();const resolve=state._passwordResolve;state._passwordResolve=null;state.passwordPending=null;state.passwordEntry=null;resetPasswordDialog();if(resolve)resolve(value)}
+  async function entryData(e,{start=null,end=null}={}){if(!e)throw new Error('Missing entry');if(e.encrypted&&!e.passwordSupported)throw unsupportedEncryptionError();for(;;){let password=null;if(e.encrypted){password=state.archivePassword||await requestArchivePassword(e);if(password==null)throw passwordCancelledError()}try{const data=start!=null&&typeof e.getDataRange==='function'?await e.getDataRange(start,end??e.size,password):await e.getData(password);if(e.encrypted){state.archivePassword=password;renderCapability();renderFiles()}return data}catch(err){if(e.encrypted&&err?.code==='BAD_PASSWORD'){state.archivePassword=null;const retry=await requestArchivePassword(e,{retry:true});if(retry==null)throw passwordCancelledError();state.archivePassword=retry;continue}throw err}}}
+  async function openArchive(file,opts={}){
+    const nested=!!opts.nested,gen=++state.generation;if(!nested){state.archiveStack=[];state.archivePassword=null}else state.archivePassword=null;
+    revokePreview(); state.file=file;state.entries=[];state.cwd='';state.active=null;state.selected.clear();state.warnings=[];state.duplicates=[];state.expandedFolders=new Set(['']);state.search='';state.typeFilter='all';state.sortKey='name';state.sortDir='asc';state.keyboardPath=null;state.inspectorTab='preview';state.analysisPath='';state.filterMin='';state.filterMax='';state.encryptedOnly=false;state.warningOnly=false;state.virtualItems=[];state.virtualized=false;state.listContextKey='';state.virtualStart=-1;
+    $('#searchInput').value='';$('#typeFilter').value='all';syncFilterInputs();
+    $('#emptyView').classList.add('hidden');$('#appView').classList.remove('hidden');$('#mobileBar').classList.remove('hidden');
+    $('#archiveName').textContent=file.name;$('#archiveMeta').textContent='';$('#archiveCapability').classList.add('hidden');$('#archiveCapability').innerHTML='';setPhase('phaseDetect',5);updateArchiveBack();showToast(t('phaseDetect'));
+    try{
+      const type=await sniff(file);if(type==='unsupported')throw new Error('unsupported-format');state.type=type;setPhase('phaseList',10);let entries;
+      if(type==='zip')entries=await parseZip(file,gen);else if(type==='tar')entries=await parseTar(file,gen);else if(type==='gzip')entries=await parseGzip(file,gen);else if(type==='cab')entries=await parseCab(file,gen);else if(type==='iso')entries=await parseIso(file,gen);else if(type==='lzh')entries=await parseLzh(file,gen);else if(type==='rar')entries=await parseRar(file,gen);else if(type==='7z')entries=await parse7z(file,gen);else throw new Error('unsupported-format');
+      if(gen!==state.generation)return;
+      state.entries=entries.filter(e=>e.path);$('#archiveMeta').textContent=archiveMetaText();renderCapability();renderStats();renderTree();renderBreadcrumb();renderFiles();renderInspector();showView('explorerView');
+      setPhase('phaseAnalyze',30);await new Promise(r=>setTimeout(r,0));if(gen!==state.generation)return;
+      state.warnings=buildWarnings();setPhase('phaseAnalyze',65);await new Promise(r=>setTimeout(r,0));state.duplicates=buildDuplicates();renderAll();setPhase('phaseReady');updateArchiveBack();showToast(`${state.entries.filter(e=>!e.dir).length} ${t('files')}`);
+    }catch(err){
+      console.error(err);if(nested&&state.archiveStack.length){const snap=state.archiveStack.pop();applySnapshot(snap)}else resetToEmpty();
+      if(err?.code==='UNSUPPORTED_ENCRYPTION'){showToast(t('encryptedArchiveUnsupported'),4500);return}const unsupported=err.message==='unsupported-format'||/Unsupported|Only LZMA/i.test(err.message||'');showToast(unsupported?t('unsupportedFormat'):t('invalidArchive'),4500);
+    }
+  }
+  async function openNestedArchive(e){
+    if(!canOpenNested(e))return;try{showToast(t('saving'));const data=await entryData(e);const snap=archiveSnapshot();state.archiveStack.push(snap);const f=new File([data],e.name,{lastModified:e.modified?.getTime?.()||Date.now()});await openArchive(f,{nested:true})}catch(err){if(err?.code==='PASSWORD_CANCELLED'){showToast(t('passwordCancelled'));return}console.error(err);showToast(t('invalidArchive'),4000)}
+  }
+  function canOpenNested(e){return !e.dir&&canExtractEntry(e)&&/\.(zip|tar|gz|tgz|cab|iso|lzh|lha|rar|7z)$/i.test(e.name)}
+  function folderSet(){
+    const s=new Set(['']);
+    state.entries.forEach(e=>{let d=e.dir?e.path:dirname(e.path);while(d){s.add(d);d=dirname(d)}});
+    return s;
+  }
+  function directItems(folder){
+    const dirs=new Map(),files=[];
+    for(const e of state.entries){
+      if(e.dir)continue;
+      const d=dirname(e.path);
+      if(d===folder)files.push(e);
+      else{
+        const prefix=folder?folder+'/':'';
+        if(d.startsWith(prefix)){
+          const rest=d.slice(prefix.length);const first=rest.split('/')[0];
+          if(first){const path=prefix+first;dirs.set(path,{path,name:first,dir:true})}
+        }
+      }
+    }
+    return [...dirs.values(),...files]
+  }
+  function descendantCount(folder){const p=folder?folder+'/':'';return state.entries.filter(e=>!e.dir&&(folder===''||e.path.startsWith(p))).length}
+  function folderSize(folder){const p=folder?folder+'/':'';return state.entries.filter(e=>!e.dir&&(folder===''||e.path.startsWith(p))).reduce((a,e)=>a+e.size,0)}
+  function childAggregates(folder=''){
+    const prefix=folder?folder+'/':'',m=new Map();
+    state.entries.filter(e=>!e.dir&&(folder===''||e.path.startsWith(prefix))).forEach(e=>{const rest=folder?e.path.slice(prefix.length):e.path;const parts=rest.split('/');const name=parts[0];const path=folder?folder+'/'+name:name;const isDir=parts.length>1;const key=(isDir?'d:':'f:')+path;const cur=m.get(key)||{name,path,size:0,dir:isDir};cur.size+=e.size;m.set(key,cur)});
+    return [...m.values()].sort((a,b)=>b.size-a.size)
+  }
+  function topLevelAggregates(){return childAggregates('').map(x=>[x.name,x.size])}
+  function buildWarnings(){
+    const files=state.entries.filter(e=>!e.dir),list=[];
+    const trav=files.filter(e=>/(^|\/)\.\.(\/|$)/.test(e.path)||/^[\\/]/.test(e.path)||/^[A-Za-z]:[\\/]/.test(e.path));
+    const exec=files.filter(e=>/\.(exe|dll|scr|com|msi|bat|cmd|ps1|vbs|js|jse|wsf|hta|lnk)$/i.test(e.name));
+    const dbl=files.filter(e=>/\.(pdf|jpg|jpeg|png|gif|doc|docx|xls|xlsx|ppt|pptx|txt|zip)\.(exe|scr|com|bat|cmd|ps1|vbs|js|lnk)$/i.test(e.name));
+    const bomb=files.filter(e=>e.compressedSize>0&&e.size>10*1024*1024&&e.size/e.compressedSize>500);
+    const enc=files.filter(e=>e.encrypted),nested=files.filter(e=>classify(e.path)==='archive'),unsup=files.filter(e=>e.unsupported);
+    const add=(kind,arr,tone='warning')=>{if(arr.length)list.push({kind,arr,tone})};
+    add('Traversal',trav,'danger');add('DoubleExt',dbl,'danger');add('Bomb',bomb,'danger');add('Executable',exec);add('Encrypted',enc);add('Unsupported',unsup);add('Nested',nested);
+    return list
+  }
+  function buildDuplicates(){
+    const m=new Map();
+    state.entries.filter(e=>!e.dir&&e.size>0&&e.crc32!=null).forEach(e=>{const k=`${e.size}:${e.crc32>>>0}`;if(!m.has(k))m.set(k,[]);m.get(k).push(e)});
+    return [...m.values()].filter(a=>a.length>1).sort((a,b)=>b[0].size*a.length-a[0].size*b.length)
+  }
+  function renderAll(){
+    if(!state.file)return;
+    renderCapability();renderStats();renderTree();renderBreadcrumb();renderFiles();renderInspector();renderAnalysis();renderSafety();syncPaneState();updateArchiveBack();updateFilterBadge();
+  }
+  function renderStats(){
+    const files=state.entries.filter(e=>!e.dir),folders=folderSet();folders.delete('');
+    const unpacked=files.reduce((a,e)=>a+e.size,0),packed=state.type==='zip'?files.reduce((a,e)=>a+e.compressedSize,0):state.file.size;
+    $('#statFiles').textContent=files.length.toLocaleString(state.lang);$('#statFolders').textContent=folders.size.toLocaleString(state.lang);$('#statPacked').textContent=fmtBytes(packed);$('#statUnpacked').textContent=fmtBytes(unpacked);$('#statRatio').textContent=unpacked?fmtRatio(1-packed/unpacked):'-';$('#statWarnings').textContent=state.warnings.reduce((a,w)=>a+w.arr.length,0).toLocaleString(state.lang);
+    $('#warningBadge').textContent=state.warnings.length?`(${state.warnings.reduce((a,w)=>a+w.arr.length,0)})`:'';
+  }
+  function renderTree(){
+    const all=[...folderSet()];
+    const children=new Map();
+    all.forEach(f=>{if(!f)return;const parent=dirname(f);if(!children.has(parent))children.set(parent,[]);children.get(parent).push(f)});
+    children.forEach(list=>list.sort((a,b)=>basename(a).localeCompare(basename(b),state.lang)));
+    const rows=[];
+    const pushRow=(f,depth)=>{
+      const kids=children.get(f)||[],hasKids=kids.length>0,isOpen=state.expandedFolders.has(f),name=f?basename(f):t('root');
+      rows.push(`<div class="folder-row" style="padding-left:${Math.min(depth,8)*13}px"><button class="folder-chevron ${hasKids?(isOpen?'open':''):'placeholder'}" type="button" data-toggle-folder="${esc(f)}" aria-label="${esc(name)}" ${hasKids?`aria-expanded="${isOpen}"`:''}>${icon('chevron')}</button><button class="folder-btn ${f===state.cwd?'active':''}" type="button" data-folder="${esc(f)}">${icon('folder')}<span class="folder-label" title="${esc(name)}">${esc(name)}</span><span class="folder-count">${descendantCount(f)}</span></button></div>`);
+      if(hasKids&&isOpen)kids.forEach(k=>pushRow(k,depth+1));
+    };
+    pushRow('',0);
+    $('#folderTree').innerHTML=rows.join('');
+    $$('#folderTree [data-toggle-folder]').forEach(b=>b.onclick=e=>{e.stopPropagation();const f=b.dataset.toggleFolder;if(state.expandedFolders.has(f))state.expandedFolders.delete(f);else state.expandedFolders.add(f);renderTree()});
+    $$('#folderTree [data-folder]').forEach(b=>b.onclick=()=>{const f=b.dataset.folder;state.cwd=f;state.active=null;let cur=f;while(cur){state.expandedFolders.add(dirname(cur));cur=dirname(cur)};$('#explorer').classList.remove('show-inspector');renderTree();renderBreadcrumb();renderFiles();renderInspector()})
+  }
+  function renderBreadcrumb(){
+    const bits=[];
+    state.archiveStack.forEach((snap,i)=>{bits.push(`<button class="archive-crumb" data-archive-level="${i}" title="${esc(snap.file.name)}">${esc(snap.file.name)}</button><span class="crumb-sep">›</span>`)});
+    if(state.file)bits.push(`<button class="archive-crumb" type="button" title="${esc(state.file.name)}">${esc(state.file.name)}</button><span class="crumb-sep">›</span>`);
+    bits.push(`<button data-crumb="">${esc(t('root'))}</button>`);let cur='';
+    (state.cwd?state.cwd.split('/'):[]).forEach(p=>{cur=cur?cur+'/'+p:p;bits.push(`<span class="crumb-sep">›</span><button data-crumb="${esc(cur)}" title="${esc(p)}">${esc(p)}</button>`)});
+    $('#breadcrumb').innerHTML=bits.join('');
+    $$('#breadcrumb [data-archive-level]').forEach(b=>b.onclick=()=>restoreArchiveLevel(Number(b.dataset.archiveLevel)));
+    $$('#breadcrumb [data-crumb]').forEach(b=>b.onclick=()=>{state.cwd=b.dataset.crumb;state.active=null;state.keyboardPath=null;renderTree();renderBreadcrumb();renderFiles();renderInspector()})
+  }
+  function entryHasWarning(e){return state.warnings.some(w=>w.arr.some(x=>x.path===e.path))}
+  function parseSearchQuery(q){const out={terms:[],ext:null,min:null,max:null};for(const raw of q.trim().split(/\s+/).filter(Boolean)){const low=raw.toLowerCase();if(low.startsWith('ext:'))out.ext=low.slice(4).replace(/^\./,'');else if(/^\*\.[a-z0-9]+$/i.test(low))out.ext=low.slice(2);else if(/^[<>]/.test(low)){const n=parseSizeValue(low.slice(1));if(n!=null){if(low[0]==='>')out.min=n;else out.max=n}}else out.terms.push(low)}return out}
+  function filteredItems(){
+    const query=parseSearchQuery(state.search),hasSearch=state.search.trim()||state.typeFilter!=='all'||state.filterMin||state.filterMax||state.encryptedOnly||state.warningOnly;
+    let items=hasSearch?state.entries.filter(e=>!e.dir&&(state.cwd===''||e.path.startsWith(state.cwd+'/')||dirname(e.path)===state.cwd)):directItems(state.cwd);
+    const min=state.filterMin?parseSizeValue(state.filterMin):null,max=state.filterMax?parseSizeValue(state.filterMax):null;
+    if(query.terms.length)items=items.filter(x=>query.terms.every(term=>x.name.toLowerCase().includes(term)||x.path.toLowerCase().includes(term)));
+    if(query.ext)items=items.filter(x=>!x.dir&&extOf(x.path)===query.ext);
+    const lo=query.min??min,hi=query.max??max;if(lo!=null)items=items.filter(x=>(x.dir?folderSize(x.path):x.size)>=lo);if(hi!=null)items=items.filter(x=>(x.dir?folderSize(x.path):x.size)<=hi);
+    if(state.typeFilter!=='all')items=items.filter(x=>x.dir||classify(x.path)===state.typeFilter||(state.typeFilter==='other'&&['pdf','other'].includes(classify(x.path))));
+    if(state.encryptedOnly)items=items.filter(x=>!x.dir&&x.encrypted);if(state.warningOnly)items=items.filter(x=>!x.dir&&entryHasWarning(x));
+    const val=e=>state.sortKey==='size'?(e.dir?folderSize(e.path):e.size):state.sortKey==='ratio'?(ratio(e)??-1):e.name.toLocaleLowerCase?.(state.lang)||e.name.toLowerCase();
+    items.sort((a,b)=>{if(a.dir!==b.dir)return Number(b.dir)-Number(a.dir);const av=val(a),bv=val(b),cmp=typeof av==='number'?av-bv:String(av).localeCompare(String(bv),state.lang);return(state.sortDir==='asc'?1:-1)*cmp});return items
+  }
+  const VIRTUAL_THRESHOLD=250,VIRTUAL_OVERSCAN=8;
+  function fileRowHeight(){return matchMedia('(max-width:720px)').matches?58:45}
+  function fileListContextKey(){return [state.cwd,state.search,state.typeFilter,state.filterMin,state.filterMax,state.encryptedOnly,state.warningOnly,state.sortKey,state.sortDir].join('\u0001')}
+  function rowHtml(e,searching){const k=e.dir?'folder':classify(e.path),extras=[];if(searching&&!e.dir&&dirname(e.path)!==state.cwd)extras.push(dirname(e.path));if(e.dir)extras.push(`${descendantCount(e.path)} ${t('files')}`);else if(k==='archive')extras.push(t('typeArchive'));if(e.encrypted)extras.push(e.passwordSupported?(state.archivePassword?t('entryUnlocked'):t('entryPassword')):t('entryEncryptionUnsupported'));else if(e.unsupported)extras.push(t('entryUnsupported'));if(entryHasWarning(e))extras.push('!');const blocked=!e.dir&&!canExtractEntry(e),status=e.encrypted?`<span class="entry-state locked">${esc(e.passwordSupported?(state.archivePassword?t('entryUnlocked'):t('entryPassword')):t('entryEncryptionUnsupported'))}</span>`:e.unsupported?`<span class="entry-state">${esc(t('entryUnsupported'))}</span>`:'';return `<div class="file-row ${state.active===e.path?'active':''} ${state.keyboardPath===e.path?'keyboard':''}" data-row-path="${esc(e.path)}">
+        <div>${e.dir?'':`<input class="select-box" type="checkbox" data-select="${esc(e.path)}" ${state.selected.has(e.path)?'checked':''} ${blocked?'disabled':''} aria-label="${esc(e.name)}" title="${blocked?esc(extractionBlockReason(e)):esc(e.name)}">`}</div>
+        <button type="button" class="file-main" data-open="${esc(e.path)}" data-dir="${e.dir?'1':'0'}"><span class="${e.dir?'folder-icon':'file-icon'}">${icon(k)}</span><span class="file-name">${esc(e.name)}${status}<span class="file-sub">${esc(extras.join(' · '))}</span></span></button>
+        <div class="size-cell">${e.dir?fmtBytes(folderSize(e.path)):fmtBytes(e.size)}</div><div class="ratio-cell">${e.dir?'':fmtRatio(ratio(e))}</div></div>`}
+  function renderVirtualWindow(force=false){if(!state.virtualized)return;const host=$('#fileList'),items=state.virtualItems,h=fileRowHeight(),view=host.clientHeight||534,top=host.scrollTop,start=Math.max(0,Math.floor(top/h)-VIRTUAL_OVERSCAN),end=Math.min(items.length,Math.ceil((top+view)/h)+VIRTUAL_OVERSCAN);if(!force&&start===state.virtualStart)return;state.virtualStart=start;const box=host.querySelector('.virtual-items');if(!box)return;box.style.transform=`translateY(${start*h}px)`;box.innerHTML=items.slice(start,end).map(e=>rowHtml(e,state.virtualSearching)).join('')}
+  function ensureFileVisible(path){if(!path)return;const host=$('#fileList'),items=state.virtualItems.length?state.virtualItems:filteredItems(),idx=items.findIndex(x=>x.path===path);if(idx<0)return;if(state.virtualized){const h=fileRowHeight(),top=idx*h,bottom=top+h;if(top<host.scrollTop)host.scrollTop=top;else if(bottom>host.scrollTop+host.clientHeight)host.scrollTop=Math.max(0,bottom-host.clientHeight);renderVirtualWindow(true)}else document.querySelector(`[data-row-path="${CSS.escape(path)}"]`)?.scrollIntoView({block:'nearest'})}
+  function renderFiles(){
+    const items=filteredItems(),host=$('#fileList');$$('[data-sort]').forEach(b=>{b.classList.toggle('active',b.dataset.sort===state.sortKey);b.textContent=t(b.dataset.sort==='name'?'name':b.dataset.sort==='size'?'sizeShort':'ratioShort')+(b.dataset.sort===state.sortKey?(state.sortDir==='asc'?' ↑':' ↓'):'')});
+    const ctx=fileListContextKey(),contextChanged=ctx!==state.listContextKey;state.listContextKey=ctx;if(contextChanged)host.scrollTop=0;
+    if(!items.length){state.virtualItems=[];state.virtualized=false;state.virtualStart=-1;host.classList.remove('virtualized');host.innerHTML=`<div class="empty-list">${esc(t('emptyFolder'))}</div>`;updateSelectionBar();return}
+    if(!state.keyboardPath||!items.some(e=>e.path===state.keyboardPath))state.keyboardPath=items[0]?.path||null;
+    const searching=!!(state.search.trim()||state.typeFilter!=='all'||state.filterMin||state.filterMax||state.encryptedOnly||state.warningOnly);state.virtualItems=items;state.virtualSearching=searching;state.virtualized=items.length>=VIRTUAL_THRESHOLD;state.virtualStart=-1;
+    if(state.virtualized){const h=fileRowHeight();host.classList.add('virtualized');host.innerHTML=`<div class="virtual-space" style="height:${items.length*h}px"><div class="virtual-items"></div></div>`;renderVirtualWindow(true)}else{host.classList.remove('virtualized');host.innerHTML=items.map(e=>rowHtml(e,searching)).join('')}
+    updateSelectionBar();updateSaveLabel()
+  }
+  function openPath(path,isDir=false){state.keyboardPath=path;if(isDir){state.cwd=path;state.active=null;state.analysisPath='';$('#explorer').classList.remove('show-inspector');renderTree();renderBreadcrumb();renderFiles();renderInspector()}else{state.active=path;state.inspectorTab='preview';renderFiles();renderInspector();if(matchMedia('(max-width:720px)').matches)$('#explorer').classList.add('show-inspector')}}
+  function updateSelectionBar(){const n=state.selected.size;$('#selectionBar').classList.toggle('hidden',n===0);$('#selectionText').textContent=t('selectedCount',n)}
+  function updateSaveLabel(){const n=state.selected.size;$('#mobileSave').title=n?t('selectedCount',n):t('nothingSelected')}
+  function revokePreview(){if(state.previewUrl){URL.revokeObjectURL(state.previewUrl);state.previewUrl=null}}
+  function fileWarnings(e){return state.warnings.filter(w=>w.arr.some(x=>x.path===e.path))}
+  function magicType(bytes){const b=bytes;if(b.length>=8&&b[0]===0x89&&String.fromCharCode(...b.slice(1,4))==='PNG')return'PNG image';if(b.length>=3&&b[0]===0xff&&b[1]===0xd8&&b[2]===0xff)return'JPEG image';if(b.length>=6&&['GIF87a','GIF89a'].includes(String.fromCharCode(...b.slice(0,6))))return'GIF image';if(b.length>=5&&String.fromCharCode(...b.slice(0,5))==='%PDF-')return'PDF';if(b.length>=4&&b[0]===0x50&&b[1]===0x4b)return'ZIP';if(b.length>=6&&b[0]===0x37&&b[1]===0x7a&&b[2]===0xbc&&b[3]===0xaf&&b[4]===0x27&&b[5]===0x1c)return'7z';if(b.length>=4&&String.fromCharCode(...b.slice(0,4))==='Rar!')return'RAR';if(b.length>=4&&String.fromCharCode(...b.slice(0,4))==='MSCF')return'CAB';if(b.length>=2&&b[0]===0x1f&&b[1]===0x8b)return'GZIP';if(b.length>=4&&b[0]===0x7f&&String.fromCharCode(...b.slice(1,4))==='ELF')return'ELF executable';if(b.length>=2&&b[0]===0x4d&&b[1]===0x5a)return'PE / DOS executable';if(b.length>=12&&String.fromCharCode(...b.slice(0,4))==='RIFF'&&String.fromCharCode(...b.slice(8,12))==='WEBP')return'WebP image';return t('unknownBinary')}
+  function hexDump(bytes){const lines=[];for(let o=0;o<bytes.length;o+=16){const part=bytes.slice(o,o+16),hex=[...part].map(x=>x.toString(16).padStart(2,'0').toUpperCase()).join(' '),ascii=[...part].map(x=>x>=32&&x<=126?String.fromCharCode(x):'.').join('');lines.push(`${o.toString(16).padStart(8,'0').toUpperCase()}  ${hex.padEnd(47,' ')}  |${ascii.padEnd(16,' ')}|`)}return lines.join('\n')}
+  function renderHexPreview(bytes,e){const detected=magicType(bytes);return `<div class="hex-wrap"><div class="hex-meta"><strong>${esc(t('hexPreview'))}</strong><span>${esc(t('hexShowing',bytes.length))}</span><span>·</span><span>${esc(t('detectedType'))}: <strong>${esc(detected)}</strong></span></div><pre class="hex-dump">${esc(hexDump(bytes))}</pre></div>`}
+  async function renderInspector(){
+    revokePreview();const host=$('#inspector'),path=state.active,e=state.entries.find(x=>x.path===path&&!x.dir);
+    if(!e){host.innerHTML=`<div class="inspector-empty">${esc(t('selectFile'))}</div>`;return}
+    const notes=fileWarnings(e),noteCount=notes.length,gen=state.generation;const mod=e.modified?new Intl.DateTimeFormat(state.lang==='ja'?'ja-JP':'en-US',{dateStyle:'medium',timeStyle:'short'}).format(e.modified):'-';
+    host.innerHTML=`<div class="inspector-tabs"><button class="inspector-tab ${state.inspectorTab==='preview'?'active':''}" data-inspect-tab="preview">${esc(t('preview'))}</button><button class="inspector-tab ${state.inspectorTab==='details'?'active':''}" data-inspect-tab="details">${esc(t('details'))}</button><button class="inspector-tab ${state.inspectorTab==='notes'?'active':''}" data-inspect-tab="notes">${esc(t('notes'))}${noteCount?` (${noteCount})`:''}</button></div><div class="inspect-body"><div class="inspect-title">${esc(e.name)}</div><div class="inspect-path">${esc(e.path)}</div>
+      <div id="inspectPreviewPanel" class="${state.inspectorTab==='preview'?'':'hidden'}"><div class="preview" id="previewBox"><div class="preview-message">${esc(t('preview'))}…</div></div>${canOpenNested(e)?`<button class="button primary small nested-open" id="openNested" type="button">${esc(t('openNested'))}</button>`:''}</div>
+      <div id="inspectDetailsPanel" class="${state.inspectorTab==='details'?'':'hidden'}"><div class="kv"><span>${esc(t('size'))}</span><span>${fmtBytes(e.size)}</span></div><div class="kv"><span>${esc(t('compressedSize'))}</span><span>${fmtBytes(e.compressedSize)}</span></div><div class="kv"><span>${esc(t('ratio'))}</span><span>${fmtRatio(ratio(e))}</span></div><div class="kv"><span>${esc(t('method'))}</span><span>${esc(methodName(e))}</span></div><div class="kv"><span>${esc(t('modified'))}</span><span>${esc(mod)}</span></div><div class="kv"><span>${esc(t('crc'))}</span><span>${e.crc32==null?'-':(e.crc32>>>0).toString(16).padStart(8,'0').toUpperCase()}</span></div><div class="kv"><span>${esc(t('encrypted'))}</span><span>${esc(e.encrypted?t('yes'):t('no'))}</span></div>${e.encrypted?`<div class="kv"><span>${esc(t('encryptionScheme'))}</span><span>${esc(e.encryptionScheme==='zipcrypto'?t('zipCrypto'):e.encryptionScheme==='aes'?'AES':String(e.encryptionScheme||'-'))}</span></div><div class="kv"><span>${esc(t('passwordMemory'))}</span><span>${esc(t('memoryOnly'))}</span></div>`:''}<div class="kv"><span>${esc(t('extractability'))}</span><span>${esc(canExtractEntry(e)?t('available'):t('unavailable'))}</span></div></div>
+      <div id="inspectNotesPanel" class="${state.inspectorTab==='notes'?'':'hidden'}"><div class="file-note-list">${notes.length?notes.map(w=>`<div class="file-note ${w.tone==='danger'?'danger':''}"><strong>${esc(t('warn'+w.kind))}</strong><div class="hint">${esc(t('warn'+w.kind+'Desc'))}</div></div>`).join(''):`<div class="hint">${esc(t('noFileNotes'))}</div>`}</div></div>
+      <div class="inspect-actions"><button class="button primary small" id="extractOne" type="button" ${canExtractEntry(e)?'':`disabled title="${esc(extractionBlockReason(e)||t('cannotExtract'))}"`}>${esc(canExtractEntry(e)?t('extract'):t('cannotExtract'))}</button></div></div>`;
+    $$('#inspector [data-inspect-tab]').forEach(b=>b.onclick=()=>{state.inspectorTab=b.dataset.inspectTab;renderInspector()});$('#extractOne').onclick=()=>{if(canExtractEntry(e))downloadEntry(e)};if($('#openNested'))$('#openNested').onclick=()=>openNestedArchive(e);
+    if(state.inspectorTab!=='preview')return;const box=$('#previewBox'),kind=classify(e.path);
+    try{if(!canExtractEntry(e)){box.innerHTML=`<div class="preview-message">${esc(extractionBlockReason(e)||t('noPreview'))}</div>`;return}if(kind==='other'){const max=4096;if(!e.getDataRange&&e.size>64*1024*1024){box.innerHTML=`<div class="preview-message">${esc(t('hexTooLarge'))}</div>`;return}const data=await entryData(e,{start:0,end:Math.min(max,e.size)});if(gen!==state.generation||state.active!==path||state.inspectorTab!=='preview')return;box.innerHTML=renderHexPreview(data,e);return}const limit=(kind==='image'?20:kind==='text'||kind==='code'?4:0)*1024*1024;if(!limit){box.innerHTML=`<div class="preview-message">${esc(t('noPreview'))}</div>`;return}if(e.size>limit){box.innerHTML=`<div class="preview-message">${esc(t('tooLargePreview'))}</div>`;return}const data=await entryData(e);if(gen!==state.generation||state.active!==path||state.inspectorTab!=='preview')return;if(kind==='image'){const mime={png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',gif:'image/gif',webp:'image/webp',bmp:'image/bmp',avif:'image/avif',ico:'image/x-icon'}[extOf(e.path)]||'application/octet-stream';state.previewUrl=URL.createObjectURL(new Blob([data],{type:mime}));box.innerHTML=`<img src="${state.previewUrl}" alt="${esc(e.name)}">`}else{let txt=UTF8.decode(data);if(txt.length>150000)txt=txt.slice(0,150000)+'\n…';box.innerHTML=`<pre>${esc(txt)}</pre>`}}catch(err){if(err?.code==='PASSWORD_CANCELLED'){box.innerHTML=`<div class="preview-message">${esc(t('passwordCancelled'))}</div>`;return}console.error(err);box.innerHTML=`<div class="preview-message">${esc(t('previewFailed'))}</div>`}
+  }
+  function typeLabel(k){return t({image:'typeImage',text:'typeText',code:'typeCode',archive:'typeArchive',pdf:'typePdf',other:'typeOther'}[k]||'typeOther')}
+  function renderAnalysis(){
+    const files=state.entries.filter(e=>!e.dir),unpacked=files.reduce((a,e)=>a+e.size,0),packed=state.type==='zip'?files.reduce((a,e)=>a+e.compressedSize,0):state.file.size;
+    $('#analysisCards').innerHTML=[[t('totalFiles'),files.length.toLocaleString(state.lang)],[t('totalSize'),fmtBytes(unpacked)],[t('compressedTotal'),fmtBytes(packed)],[t('compressionSaving'),unpacked?fmtRatio(1-packed/unpacked):'-']].map(([a,b])=>`<div class="analysis-card"><span>${esc(a)}</span><strong>${esc(b)}</strong></div>`).join('');
+    const folders=topLevelAggregates().slice(0,7),maxF=folders[0]?.[1]||1;$('#folderBars').innerHTML=folders.map(([n,s])=>bar(n,s/maxF,fmtBytes(s))).join('')||`<div class="muted">${esc(t('none'))}</div>`;
+    const types=new Map();files.forEach(e=>{const k=classify(e.path);types.set(k,(types.get(k)||0)+e.size)});const ts=[...types].sort((a,b)=>b[1]-a[1]),maxT=ts[0]?.[1]||1;$('#typeBars').innerHTML=ts.map(([k,s])=>bar(typeLabel(k),s/maxT,fmtBytes(s))).join('');renderTreemap()
+  }
+  function renderTreemap(){const aggs=childAggregates(state.analysisPath).slice(0,18),sum=aggs.reduce((a,x)=>a+x.size,0)||1;$('#mapBreadcrumb').textContent=state.analysisPath?`${state.file.name} › ${state.analysisPath.split('/').join(' › ')}`:state.file.name;$('#mapUp').classList.toggle('hidden',!state.analysisPath);$('#treemap').innerHTML=aggs.length?aggs.map(x=>`<button class="treeblock" type="button" data-map-path="${esc(x.path)}" data-map-dir="${x.dir?'1':'0'}" style="flex:${Math.max(1,x.size/sum*100)} 1 0"><span>${esc(x.name)}<small>${fmtBytes(x.size)}</small></span></button>`).join(''):`<div class="empty-list">${esc(t('none'))}</div>`;$$('#treemap [data-map-path]').forEach(b=>b.onclick=()=>{if(b.dataset.mapDir==='1'){state.analysisPath=b.dataset.mapPath;renderTreemap()}else jumpToEntry(b.dataset.mapPath)})}
+  function bar(name,f,val){return `<div class="bar-row"><span class="bar-label" title="${esc(name)}">${esc(name)}</span><div class="bar-track"><div class="bar-fill" style="width:${Math.max(2,Math.min(100,f*100))}%"></div></div><span class="bar-value">${esc(val)}</span></div>`}
+  function jumpToEntry(path){const e=state.entries.find(x=>x.path===path&&!x.dir);if(!e)return;state.search='';state.typeFilter='all';state.filterMin=state.filterMax='';state.encryptedOnly=state.warningOnly=false;$('#searchInput').value='';$('#typeFilter').value='all';syncFilterInputs();state.cwd=dirname(e.path);state.active=e.path;state.keyboardPath=e.path;state.inspectorTab='preview';let d=state.cwd;while(d){state.expandedFolders.add(d);d=dirname(d)}showView('explorerView');$('#explorer').classList.remove('inspector-collapsed');state.rightCollapsed=false;syncPaneState();renderTree();renderBreadcrumb();renderFiles();renderInspector();setTimeout(()=>ensureFileVisible(e.path),0)}
+  function renderSafety(){
+    const host=$('#noticeList');if(!state.warnings.length)host.innerHTML=`<div class="analysis-section ok-card">${icon('ok')}<h3>${esc(t('safetyOk'))}</h3><p class="muted">${esc(t('safetyOkDesc'))}</p></div>`;else host.innerHTML=state.warnings.map(w=>{const title=t('warn'+w.kind),desc=t('warn'+w.kind+'Desc');return `<div class="notice ${w.tone}"><div class="notice-title">${icon('warn')}<span>${esc(title)} · ${w.arr.length}</span></div><p>${esc(desc)}</p><div class="notice-paths">${w.arr.slice(0,10).map(e=>`<button class="path-chip" type="button" data-jump="${esc(e.path)}" title="${esc(e.path)}">${esc(e.path)}</button>`).join('')}${w.arr.length>10?`<span class="hint">+${w.arr.length-10}</span>`:''}</div></div>`}).join('');
+    $('#duplicateList').innerHTML=state.duplicates.length?state.duplicates.slice(0,20).map(g=>`<div class="dup-group"><strong>${g.length} × ${fmtBytes(g[0].size)}</strong><div>${g.map(e=>`<button class="dup-path" type="button" data-jump="${esc(e.path)}">${esc(e.path)}</button>`).join('')}</div></div>`).join(''):`<div class="muted">${esc(t('noDuplicates'))}</div>`;$$('[data-jump]').forEach(b=>b.onclick=()=>jumpToEntry(b.dataset.jump))
+  }
+  function safeFilename(name,fallback='download'){let n=String(name||'').replace(/[\\/:*?"<>|\x00-\x1f]/g,'_').trim().replace(/\.+$/,'');return n||fallback}
+  function triggerDownload(blob,name){const a=document.createElement('a');const url=URL.createObjectURL(blob);a.href=url;a.download=safeFilename(name);document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),4000)}
+  async function downloadEntry(e){if(!canExtractEntry(e)){showToast(extractionBlockReason(e)||t('cannotExtract'));return}try{showToast(t('saving'));const d=await entryData(e);triggerDownload(new Blob([d]),e.name);showToast(t('savedToast'))}catch(err){if(err?.code==='PASSWORD_CANCELLED'){showToast(t('passwordCancelled'));return}console.error(err);showToast(t('previewFailed'))}}
+  function u16(n){return[n&255,(n>>8)&255]} function u32(n){return[n&255,(n>>8)&255,(n>>16)&255,(n>>24)&255]}
+  function dosNow(d){d=d||new Date();const date=((Math.max(1980,d.getFullYear())-1980)<<9)|((d.getMonth()+1)<<5)|d.getDate();const time=(d.getHours()<<11)|(d.getMinutes()<<5)|(d.getSeconds()>>1);return{date,time}}
+  async function buildStoredZip(entries){
+    const files=[];for(const e of entries){const data=await entryData(e);files.push({e,data,crc:crc32(data),name:new TextEncoder().encode(cleanPath(e.path))})}
+    let offset=0,locals=[],centrals=[];
+    for(const f of files){
+      const dt=dosNow(f.e.modified),nl=f.name.length;
+      const lh=new Uint8Array([80,75,3,4,20,0,0,8,0,0,...u16(dt.time),...u16(dt.date),...u32(f.crc),...u32(f.data.length),...u32(f.data.length),...u16(nl),0,0,...f.name]);
+      locals.push(lh,f.data);
+      const ch=new Uint8Array([80,75,1,2,20,0,20,0,0,8,0,0,...u16(dt.time),...u16(dt.date),...u32(f.crc),...u32(f.data.length),...u32(f.data.length),...u16(nl),0,0,0,0,0,0,0,0,0,0,0,0,...u32(offset),...f.name]);
+      centrals.push(ch);offset+=lh.length+f.data.length
+    }
+    const cdSize=centrals.reduce((a,x)=>a+x.length,0),count=files.length;
+    const end=new Uint8Array([80,75,5,6,0,0,0,0,...u16(count),...u16(count),...u32(cdSize),...u32(offset),0,0]);
+    return new Blob([...locals,...centrals,end],{type:'application/zip'})
+  }
+  async function saveSelected(){
+    const es=state.entries.filter(e=>state.selected.has(e.path)&&canExtractEntry(e));if(!es.length){showToast(t('nothingSelected'));return}
+    try{showToast(t('saving'));if(es.length===1){await downloadEntry(es[0]);return}
+      const blob=await buildStoredZip(es);const base=safeFilename(state.file.name.replace(/\.[^.]+$/,''),'archive');triggerDownload(blob,base+'-selected.zip');showToast(t('savedToast'))
+    }catch(err){if(err?.code==='PASSWORD_CANCELLED'){showToast(t('passwordCancelled'));return}console.error(err);showToast(t('previewFailed'))}
+  }
+  function manifestRows(){return state.entries.filter(e=>!e.dir).map(e=>({path:e.path,size:e.size,compressedSize:e.compressedSize,compressionRatio:ratio(e),modified:e.modified?e.modified.toISOString():null,method:methodName(e),crc32:e.crc32==null?null:(e.crc32>>>0).toString(16).padStart(8,'0'),encrypted:e.encrypted,extractable:canExtractEntry(e),unsupported:!!e.unsupported,type:classify(e.path)}))}
+  function openExport(){
+    const base=safeFilename((state.file?.name||'archive').replace(/\.(tar\.gz|tgz|zip|7z|rar|tar|gz|cab|iso|lzh|lha)$/i,''),'archive')+'-list';$('#exportName').value=base;state.exportFormat='json';updateExportUI();$('#exportDialog').showModal()
+  }
+  function updateExportUI(){$('#exportExt').textContent='.'+state.exportFormat;$$('#exportFormatRow [data-format]').forEach(b=>b.classList.toggle('primary',b.dataset.format===state.exportFormat))}
+  function doExport(){
+    const rows=manifestRows(),fmt=state.exportFormat;let text,mime;
+    if(fmt==='json'){text=JSON.stringify({archive:state.file.name,format:state.type,generatedAt:new Date().toISOString(),files:rows},null,2);mime='application/json'}
+    else if(fmt==='csv'){const cols=['path','size','compressedSize','compressionRatio','modified','method','crc32','encrypted','extractable','unsupported','type'];const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;text='\ufeff'+cols.join(',')+'\n'+rows.map(r=>cols.map(c=>q(r[c])).join(',')).join('\n');mime='text/csv'}
+    else{text=rows.map(r=>`${r.path}\t${r.size}\t${r.compressedSize}`).join('\n');mime='text/plain'}
+    triggerDownload(new Blob([text],{type:mime+';charset=utf-8'}),safeFilename($('#exportName').value,'archive-list')+'.'+fmt);$('#exportDialog').close();showToast(t('manifestDone'))
+  }
+  function showView(id){
+    $$('.view-panel').forEach(v=>v.classList.toggle('hidden',v.id!==id));$$('.tab-btn').forEach(b=>b.classList.toggle('active',b.dataset.view===id));$$('#mobileBar [data-mobile-view]').forEach(b=>b.classList.toggle('active',b.dataset.mobileView===id));
+    if(id==='analysisView')renderAnalysis();if(id==='safetyView')renderSafety();if(id==='explorerView'){syncPaneState();if(matchMedia('(max-width:720px)').matches&&state.active)$('#explorer').classList.add('show-inspector')}
+  }
+  function resetToEmpty(){++state.generation;revokePreview();state.file=null;state.entries=[];state.selected.clear();state.archiveStack=[];state.archivePassword=null;if(state.passwordPending)finishPasswordDialog(null);state.analysisPath='';state.virtualItems=[];state.virtualized=false;state.listContextKey='';setPhase('',null);$('#appView').classList.add('hidden');$('#mobileBar').classList.add('hidden');$('#emptyView').classList.remove('hidden');$('#fileInput').value=''}
+  let toastTimer;function showToast(msg,ms=2200){const el=$('#toast');el.textContent=msg;el.classList.remove('hidden');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.add('hidden'),ms)}
+  function syncFilterInputs(){if(!$('#minSize'))return;$('#minSize').value=state.filterMin;$('#maxSize').value=state.filterMax;$('#encryptedOnly').checked=state.encryptedOnly;$('#warningOnly').checked=state.warningOnly;updateFilterBadge()}
+  function updateFilterBadge(){const n=[state.filterMin,state.filterMax,state.encryptedOnly,state.warningOnly].filter(Boolean).length;$('#filterCount').textContent=n?`(${n})`:'';$('#filterBtn').classList.toggle('active',n>0);$('#filterBtn').setAttribute('aria-expanded',String(!$('#filterPopover').classList.contains('hidden')))}
+  function syncPaneState(){const ex=$('#explorer');ex.classList.toggle('folder-collapsed',state.leftCollapsed);ex.classList.toggle('inspector-collapsed',state.rightCollapsed);$('#showFolders').classList.toggle('hidden',!state.leftCollapsed);$('#showInspector').classList.toggle('hidden',!state.rightCollapsed)}
+  function setupResizer(id,side){const el=$(id);let startX,startW;const move=e=>{const x=e.clientX??e.touches?.[0]?.clientX;if(x==null)return;const delta=x-startX;const min=150,max=420;const w=Math.max(min,Math.min(max,startW+(side==='left'?delta:-delta)));document.documentElement.style.setProperty(side==='left'?'--folder-width':'--inspector-width',w+'px')};const end=()=>{el.classList.remove('dragging');window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',end)};el.addEventListener('pointerdown',e=>{if(matchMedia('(max-width:980px)').matches)return;startX=e.clientX;startW=parseFloat(getComputedStyle(document.documentElement).getPropertyValue(side==='left'?'--folder-width':'--inspector-width'))|| (side==='left'?228:330);el.classList.add('dragging');el.setPointerCapture?.(e.pointerId);window.addEventListener('pointermove',move);window.addEventListener('pointerup',end)});el.addEventListener('keydown',e=>{if(!['ArrowLeft','ArrowRight'].includes(e.key))return;e.preventDefault();const prop=side==='left'?'--folder-width':'--inspector-width',cur=parseFloat(getComputedStyle(document.documentElement).getPropertyValue(prop))||(side==='left'?228:330),dir=e.key==='ArrowRight'?1:-1;document.documentElement.style.setProperty(prop,Math.max(150,Math.min(420,cur+dir*12))+'px')})}
+  function keyboardNavigate(e){if(!state.file||!$('#explorerView')||$('#explorerView').classList.contains('hidden'))return;if(e.target.matches('input,select,textarea,button')||document.querySelector('dialog[open]'))return;const items=filteredItems();if(!items.length)return;let i=Math.max(0,items.findIndex(x=>x.path===state.keyboardPath));if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();i=Math.max(0,Math.min(items.length-1,i+(e.key==='ArrowDown'?1:-1)));state.keyboardPath=items[i].path;renderFiles();ensureFileVisible(state.keyboardPath)}else if(e.key==='Enter'){e.preventDefault();const x=items[i];openPath(x.path,x.dir)}else if(e.key==='Backspace'&&state.cwd){e.preventDefault();state.cwd=dirname(state.cwd);state.active=null;renderTree();renderBreadcrumb();renderFiles();renderInspector()}else if(e.key===' '){e.preventDefault();const x=items[i];if(!x.dir){state.active=x.path;state.inspectorTab='preview';renderFiles();renderInspector()}}}
+  function bind(){
+    $('#pickBtn').onclick=()=>$('#fileInput').click();$('#replaceBtn').onclick=()=>$('#fileInput').click();
+    $('#fileInput').onchange=e=>{const f=e.target.files?.[0];if(f)openArchive(f)};
+    $('#fileList').addEventListener('click',e=>{const b=e.target.closest('[data-open]');if(b)openPath(b.dataset.open,b.dataset.dir==='1')});$('#fileList').addEventListener('change',e=>{const c=e.target.closest('[data-select]');if(!c||c.disabled)return;c.checked?state.selected.add(c.dataset.select):state.selected.delete(c.dataset.select);updateSelectionBar();updateSaveLabel()});$('#fileList').addEventListener('scroll',()=>{if(state.virtualized)renderVirtualWindow()},{passive:true});window.addEventListener('resize',()=>{if(state.virtualized){state.virtualStart=-1;renderFiles();ensureFileVisible(state.keyboardPath)}});
+    const dz=$('#dropzone');dz.onclick=e=>{if(e.target.closest('#pickBtn'))return;$('#fileInput').click()};dz.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();$('#fileInput').click()}};
+    ['dragenter','dragover'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add('drag')}));['dragleave','drop'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove('drag')}));dz.addEventListener('drop',e=>{const f=e.dataTransfer.files?.[0];if(f)openArchive(f)});
+    $('#searchInput').oninput=e=>{state.search=e.target.value;renderFiles()};$('#typeFilter').onchange=e=>{state.typeFilter=e.target.value;renderFiles()};$$('[data-sort]').forEach(b=>b.onclick=()=>{if(state.sortKey===b.dataset.sort)state.sortDir=state.sortDir==='asc'?'desc':'asc';else{state.sortKey=b.dataset.sort;state.sortDir=b.dataset.sort==='name'?'asc':'desc'}renderFiles()});
+    $$('.tab-btn').forEach(b=>b.onclick=()=>showView(b.dataset.view));$$('#mobileBar [data-mobile-view]').forEach(b=>b.onclick=()=>showView(b.dataset.mobileView));
+    $('#mobileSave').onclick=saveSelected;$('#extractSelected').onclick=saveSelected;$('#clearSelection').onclick=()=>{state.selected.clear();renderFiles()};$('#backToFiles').onclick=()=>$('#explorer').classList.remove('show-inspector');$('#backArchiveBtn').onclick=()=>restoreArchiveLevel(state.archiveStack.length-1);$('#statWarningsCard').onclick=()=>showView('safetyView');
+    $('#manifestBtn').onclick=openExport;$('#doExport').onclick=doExport;$$('[data-export-close]').forEach(b=>b.onclick=()=>$('#exportDialog').close());$$('#exportFormatRow [data-format]').forEach(b=>b.onclick=()=>{state.exportFormat=b.dataset.format;updateExportUI()});
+    $('#helpBtn').onclick=()=>$('#helpDialog').showModal();$$('[data-dialog-close]').forEach(b=>b.onclick=()=>$('#helpDialog').close());
+    $('#passwordForm').addEventListener('submit',e=>{e.preventDefault();const value=$('#archivePassword').value;if(!value){$('#passwordError').textContent=t('wrongPassword');$('#passwordError').classList.remove('hidden');$('#archivePassword').focus();return}finishPasswordDialog(value)});$('#passwordCancel').onclick=$('#passwordClose').onclick=()=>finishPasswordDialog(null);$('#passwordDialog').addEventListener('cancel',e=>{e.preventDefault();finishPasswordDialog(null)});$('#passwordToggle').onclick=()=>{const inp=$('#archivePassword'),show=inp.type==='password';inp.type=show?'text':'password';$('#passwordToggle').setAttribute('aria-label',t(show?'hidePassword':'showPassword'))};
+    [$('#helpDialog'),$('#exportDialog')].forEach(d=>d.addEventListener('click',e=>{if(e.target===d)d.close()}));
+    $('#langBtn').onclick=()=>{state.lang=state.lang==='ja'?'en':'ja';applyI18n()};
+    $('#filterBtn').onclick=e=>{e.stopPropagation();$('#filterPopover').classList.toggle('hidden');updateFilterBadge()};$('#filterPopover').onclick=e=>e.stopPropagation();$('#minSize').oninput=e=>{state.filterMin=e.target.value;updateFilterBadge();renderFiles()};$('#maxSize').oninput=e=>{state.filterMax=e.target.value;updateFilterBadge();renderFiles()};$('#encryptedOnly').onchange=e=>{state.encryptedOnly=e.target.checked;updateFilterBadge();renderFiles()};$('#warningOnly').onchange=e=>{state.warningOnly=e.target.checked;updateFilterBadge();renderFiles()};$('#clearFilters').onclick=()=>{state.filterMin=state.filterMax='';state.encryptedOnly=state.warningOnly=false;syncFilterInputs();renderFiles()};document.addEventListener('click',()=>{$('#filterPopover').classList.add('hidden');updateFilterBadge()});document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='f'&&state.file){e.preventDefault();$('#searchInput').focus();$('#searchInput').select();return}if(e.key==='Escape'&&!$('#filterPopover').classList.contains('hidden')){$('#filterPopover').classList.add('hidden');updateFilterBadge();return}keyboardNavigate(e)});
+    $('#collapseFolders').onclick=()=>{state.leftCollapsed=true;syncPaneState()};$('#showFolders').onclick=()=>{state.leftCollapsed=false;syncPaneState()};$('#collapseInspector').onclick=()=>{state.rightCollapsed=true;syncPaneState()};$('#showInspector').onclick=()=>{state.rightCollapsed=false;syncPaneState()};setupResizer('#leftResizer','left');setupResizer('#rightResizer','right');$('#mapUp').onclick=()=>{state.analysisPath=dirname(state.analysisPath);renderTreemap()};
+  }
+  bind();applyI18n();
+})();
+</script>
+<!-- APP:END -->
+</body>
+</html>

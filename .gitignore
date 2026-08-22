@@ -1,0 +1,9 @@
+.DS_Store
+Thumbs.db
+*.tmp
+*.log
+test-samples/
+*-test.png
+cdp-*.mjs
+test-engine.mjs
+script*.js

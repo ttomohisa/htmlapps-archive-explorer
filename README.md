@@ -62,6 +62,12 @@ Python, Node.js, and a local web server are not required. The builder uses Windo
 6. Open **Analysis** to inspect Archive Map, type distribution, and size/compression summaries.
 7. Select one or more extractable files and save them. Multiple selections are packaged into a new ZIP.
 
+### Search and filter recovery
+
+Search size shortcuts and the visible minimum/maximum size filters apply together: the higher minimum and lower maximum are used. Boundaries remain inclusive, so `>1KB` includes 1 KB and `<2KB` includes 2 KB. Conflicting bounds produce no matches.
+
+When a search or filter leaves no matching items, choose **Clear search and filters** in the empty list. This resets the search, type, minimum/maximum size, encrypted-only and notes-only controls while keeping the current folder, sort order, and selected files. Focus returns to search. The existing **Clear filters** control still clears only the advanced filters.
+
 ### Encrypted ZIP files
 
 Traditional ZipCrypto ZIP entries can be listed without a password. A password dialog appears only when preview, Hex view, extraction, or nested-archive opening needs the encrypted bytes.
@@ -132,6 +138,8 @@ The build process:
 - Generates `dist/build-size-report.json`
 - Keeps runtime network access blocked by the application's Content Security Policy
 - Is validated by `scripts/check-repository.ps1` in CI
+
+For focused listing/filter UI regression tests, run `node --test scripts/filter-listing.test.cjs` with Node.js. These tests use invented metadata and inert DOM/render stubs; they do not initialize the app or open archives. Set `ARCHIVE_LISTING_SOURCE=dist/index.html` to check the generated readable build with the same tests.
 
 ## Privacy and runtime network protection
 

@@ -139,7 +139,7 @@ AES暗号化ZIP、および7z / RARの暗号化解除はv1.0.0では未対応で
 - アプリ本体のContent Security Policyで実行時ネットワーク通信を禁止
 - CIで `scripts/check-repository.ps1` による構成・生成物チェックを実行
 
-一覧・絞り込みUIの回帰テストは、Node.jsで `node --test scripts/filter-listing.test.cjs` を実行します。合成したメタデータと動作を限定したDOM・描画スタブを使い、アプリの初期化やアーカイブを開く処理は実行しません。`ARCHIVE_LISTING_SOURCE=dist/index.html` を設定すると、生成した読みやすいHTMLも同じテストで確認できます。
+一覧・絞り込みUIとヘッダーの回帰テストは、Node.jsで `node --test scripts/*.test.cjs` を実行します。合成したメタデータと動作を限定したDOM・描画スタブを使い、アプリの初期化やアーカイブを開く処理は実行しません。`ARCHIVE_LISTING_SOURCE=dist/index.html` または `ARCHIVE_HEADER_SOURCE=dist/index.html` を設定すると、生成した読みやすいHTMLも対応するテストで確認できます。ヘッダーのテストでは EN / JA、切り替え先のラベルとツールチップ、ローカル処理の表記、設定されたバージョンを確認します。
 
 ## プライバシーと通信防止
 

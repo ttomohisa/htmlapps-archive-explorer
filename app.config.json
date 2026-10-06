@@ -3,7 +3,7 @@
   "name": "Archive Explorer",
   "nameJa": "Archive Explorer",
   "slug": "archive-explorer",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Inspect ZIP, 7z, RAR5, TAR, GZIP, CAB, ISO and LZH archives locally before extracting files.",
   "descriptionJa": "ZIP / 7z / RAR5 / TAR / GZIP / CAB / ISO / LZH の中身を展開前にブラウザ内だけで確認・分析できるツールです。",
   "defaultLanguage": "auto",

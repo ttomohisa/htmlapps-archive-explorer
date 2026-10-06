@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.1 - 2026-10-07
+
+- Standardize the privacy badge as 完全ローカル処理 / Fully local processing.
+- Keep EN / JA language targets and add localized accessible action labels and tooltips.
+- Synchronize the displayed semantic version with the release configuration.
+
 ## 1.0.0 - 2026-08-23
 
 First stable release of Archive Explorer.

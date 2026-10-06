@@ -57,12 +57,12 @@
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="16" fill="#16624f"/><path d="M13 11h24l8 8v26a5 5 0 0 1-5 5H13a5 5 0 0 1-5-5V16a5 5 0 0 1 5-5Z" fill="none" stroke="#fff" stroke-width="3.2" stroke-linejoin="round"/><path d="M37 11v9h8" fill="none" stroke="#fff" stroke-width="3.2" stroke-linejoin="round"/><rect x="21" y="16" width="7" height="3" rx="1.5" fill="#fff"/><rect x="25" y="20.5" width="7" height="3" rx="1.5" fill="#fff"/><rect x="21" y="25" width="7" height="3" rx="1.5" fill="#fff"/><rect x="25" y="29.5" width="7" height="3" rx="1.5" fill="#fff"/><rect x="21.5" y="33.5" width="10" height="8" rx="2.2" fill="#fff"/><rect x="24.5" y="35.5" width="4" height="3.5" rx="1" fill="#16624f"/><path d="M26.5 41.5v4" stroke="#fff" stroke-width="2.8" stroke-linecap="round"/><circle cx="43" cy="42" r="8" fill="#16624f" stroke="#fff" stroke-width="3.4"/><path d="m48.8 47.8 6.2 6.2" stroke="#fff" stroke-width="3.4" stroke-linecap="round"/></svg>
       </div>
       <div class="brand-copy">
-        <h1 class="brand-name">Archive Explorer <span class="version-badge">v1.0.0</span></h1>
+        <h1 class="brand-name">Archive Explorer <span class="version-badge">v1.0.1</span></h1>
         <p class="brand-meta" data-i18n="brandMeta">圧縮ファイルを、展開する前に理解する</p>
       </div>
     </div>
     <div class="header-actions">
-      <button class="language-button" id="langBtn" type="button" aria-label="Switch language">EN</button>
+      <button class="language-button" id="langBtn" type="button" aria-label="英語に切り替え" title="英語に切り替え">EN</button>
       <button class="header-icon-button" id="helpBtn" type="button" aria-label="使い方と注意事項">
         <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.8"/><path d="M9.8 9a2.35 2.35 0 0 1 4.5 1c0 1.8-2.3 2-2.3 3.7M12 17.2h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
       </button>
@@ -78,7 +78,7 @@
     </div>
     <div class="local-badge">
       <svg viewBox="0 0 24 24" fill="none"><path d="M7 10V7a5 5 0 0 1 10 0v3M5 10h14v10H5z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
-      <span data-i18n="localOnly">ファイルは端末の外へ送信しません</span>
+      <span data-i18n="localOnly">完全ローカル処理</span>
     </div>
   </section>
 
@@ -281,7 +281,7 @@ var e=function(){"use strict";function r(e,r){postMessage({action:nr,cbn:r,resul
   const I = {
     ja:{
       brandMeta:'圧縮ファイルを、展開する前に理解する',heroTitle:'解凍する前に、中身を確認。',heroDesc:'構成・容量・圧縮率・注意点をブラウザ内で確認し、必要なファイルだけ取り出せます。',
-      localOnly:'ファイルは端末の外へ送信しません',dropTitle:'アーカイブをここにドロップ',dropDesc:'またはファイルを選択してください。処理はすべてこのブラウザ内で行われます。',pickFile:'ファイルを選択',
+      languageTarget:'英語に切り替え',localOnly:'完全ローカル処理',dropTitle:'アーカイブをここにドロップ',dropDesc:'またはファイルを選択してください。処理はすべてこのブラウザ内で行われます。',pickFile:'ファイルを選択',
       formats:'対応: ZIP / 7z / RAR5 / TAR / GZIP / TAR.GZ / TGZ / CAB / ISO / LZH',exportList:'一覧を書き出す',openAnother:'別のファイルを開く',files:'ファイル',folders:'フォルダ',packed:'圧縮後',unpacked:'展開後',saved:'削減',
       explorer:'エクスプローラー',analysis:'分析',safety:'注意点',search:'ファイルを検索',allTypes:'すべて',images:'画像',text:'テキスト',code:'コード',archives:'アーカイブ',other:'その他',
       inspector:'Inspector',selectFile:'ファイルを選択すると、詳細とプレビューを表示します。',back:'戻る',largestFolders:'容量を使っている場所',fileTypes:'ファイル種別',archiveMap:'Archive Map',duplicates:'重複候補',
@@ -307,7 +307,7 @@ var e=function(){"use strict";function r(e,r){postMessage({action:nr,cbn:r,resul
     },
     en:{
       brandMeta:'Understand archives before extracting them',heroTitle:'Inspect first. Extract only what you need.',heroDesc:'Explore structure, size, compression and notable risks locally in your browser.',
-      localOnly:'Your files never leave this device',dropTitle:'Drop an archive here',dropDesc:'Or choose a file. All processing stays inside this browser.',pickFile:'Choose file',
+      languageTarget:'Switch to Japanese',localOnly:'Fully local processing',dropTitle:'Drop an archive here',dropDesc:'Or choose a file. All processing stays inside this browser.',pickFile:'Choose file',
       formats:'Supports: ZIP / 7z / RAR5 / TAR / GZIP / TAR.GZ / TGZ / CAB / ISO / LZH',exportList:'Export list',openAnother:'Open another',files:'Files',folders:'Folders',packed:'Packed',unpacked:'Unpacked',saved:'Saved',
       explorer:'Explorer',analysis:'Analysis',safety:'Notes',search:'Search files',allTypes:'All',images:'Images',text:'Text',code:'Code',archives:'Archives',other:'Other',
       inspector:'Inspector',selectFile:'Select a file to see details and preview.',back:'Back',largestFolders:'Largest areas',fileTypes:'File types',archiveMap:'Archive Map',duplicates:'Duplicate candidates',
@@ -346,6 +346,8 @@ var e=function(){"use strict";function r(e,r){postMessage({action:nr,cbn:r,resul
     $$('[data-i18n]').forEach(el=>{const k=el.dataset.i18n;if(I[state.lang][k]!==undefined)el.textContent=t(k)});
     $$('[data-i18n-placeholder]').forEach(el=>el.placeholder=t(el.dataset.i18nPlaceholder));$$('[data-i18n-aria]').forEach(el=>el.setAttribute('aria-label',t(el.dataset.i18nAria)));if($('#searchInput'))$('#searchInput').placeholder=t('searchHint');
     $('#langBtn').textContent=state.lang==='ja'?'EN':'JA';
+    $('#langBtn').setAttribute('aria-label',t('languageTarget'));
+    $('#langBtn').title=t('languageTarget');
     $('#helpBtn').setAttribute('aria-label',t('helpTitle'));
     renderAll();
   }

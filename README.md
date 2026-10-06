@@ -139,7 +139,7 @@ The build process:
 - Keeps runtime network access blocked by the application's Content Security Policy
 - Is validated by `scripts/check-repository.ps1` in CI
 
-For focused listing/filter UI regression tests, run `node --test scripts/filter-listing.test.cjs` with Node.js. These tests use invented metadata and inert DOM/render stubs; they do not initialize the app or open archives. Set `ARCHIVE_LISTING_SOURCE=dist/index.html` to check the generated readable build with the same tests.
+For listing/filter and header regression tests, run `node --test scripts/*.test.cjs` with Node.js. These tests use invented metadata and inert DOM/render stubs; they do not initialize the app or open archives. Set `ARCHIVE_LISTING_SOURCE=dist/index.html` or `ARCHIVE_HEADER_SOURCE=dist/index.html` to check the generated readable build with the corresponding tests. The header tests cover EN / JA targets, localized labels/tooltips, privacy wording, and the configured version.
 
 ## Privacy and runtime network protection
 

@@ -145,6 +145,9 @@ Limits:
 - visible focus
 - reduced-motion support
 - Japanese / English in one HTML
+- The language button shows the target as EN / JA, with a localized action label and tooltip.
+- The version badge uses `vMAJOR.MINOR.PATCH` and matches `app.config.json`.
+- The privacy badge reads 完全ローカル処理 / Fully local processing.
 - light-only appearance
 
 ## Interaction links

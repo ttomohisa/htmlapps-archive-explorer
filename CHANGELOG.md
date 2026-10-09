@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.2 - 2026-10-09
+
+- Add an English UI screenshot for catalog validation.
+
 ## 1.0.1 - 2026-10-07
 
 - Standardize the privacy badge as 完全ローカル処理 / Fully local processing.

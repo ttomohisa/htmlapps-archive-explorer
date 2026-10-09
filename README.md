@@ -16,6 +16,10 @@ GitHub Pages delivers only the initial HTML. After it loads, archive parsing, pr
 
 [![Archive Explorer screenshot](assets/screenshot-desktop.png)](https://ttomohisa.github.io/htmlapps-archive-explorer/)
 
+### English UI
+
+![Archive Explorer English UI](assets/screenshot-en.png)
+
 ## Features
 
 - **Explore archives before extracting** — Browse folders, filenames, sizes, packed sizes, ratios, timestamps, and CRC32 metadata in an Explorer-style UI.

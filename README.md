@@ -14,11 +14,7 @@ A privacy-focused, single-HTML archive inspector for exploring, previewing, anal
 
 GitHub Pages delivers only the initial HTML. After it loads, archive parsing, previews, analysis, password handling, and extraction are processed locally on your device. Selected archives are not uploaded by the app.
 
-[![Archive Explorer screenshot](assets/screenshot-desktop.png)](https://ttomohisa.github.io/htmlapps-archive-explorer/)
-
-### English UI
-
-![Archive Explorer English UI](assets/screenshot-en.png)
+[![Archive Explorer screenshot](assets/screenshot-en.png)](https://ttomohisa.github.io/htmlapps-archive-explorer/)
 
 ## Features
 

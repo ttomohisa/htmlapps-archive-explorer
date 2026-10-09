@@ -14,7 +14,9 @@ ZIP・7z・RAR・TAR・GZIP・CAB・ISO・LZHなどの中身を、ファイル�
 
 GitHub Pagesから最初のHTMLを読み込んだ後、アーカイブ解析・プレビュー・分析・パスワード処理・取り出しは端末内で実行されます。選択したアーカイブがアプリからサーバーへ送信されることはありません。
 
-[![Archive Explorerの画面](assets/screenshot-desktop.png)](https://ttomohisa.github.io/htmlapps-archive-explorer/)
+[![Archive Explorerの画面](assets/screenshot.png)](https://ttomohisa.github.io/htmlapps-archive-explorer/)
+
+既存の参考スクリーンショット（現行版と表示が異なります）。
 
 ## 主な機能
 

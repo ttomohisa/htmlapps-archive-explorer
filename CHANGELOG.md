@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.3 - 2026-10-11
+
+- Keep Help, manifest export and password titles/actions visible while their bodies scroll on short screens; make the Help body keyboard-focusable.
+- Prevent background page scrolling while a native modal dialog is open.
+- Use a decorative shield for the fully local processing badge.
+- Add source and release-artifact dialog layout checks to the repository validation.
+
 ## 1.0.2 - 2026-10-09
 
 - Add an English UI screenshot for catalog validation.

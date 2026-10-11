@@ -148,6 +148,8 @@ Limits:
 - The language button shows the target as EN / JA, with a localized action label and tooltip.
 - The version badge uses `vMAJOR.MINOR.PATCH` and matches `app.config.json`.
 - The privacy badge reads 完全ローカル処理 / Fully local processing.
+- Help, manifest export and password dialogs fit the current viewport; only their bodies scroll, keeping titles and action controls visible. The Help body is keyboard-focusable.
+- Native modal dialogs prevent background page scrolling and restore it when closed.
 - light-only appearance
 
 ## Interaction links

@@ -7,6 +7,21 @@ $BuildScript = Join-Path $Root "build-standalone.ps1"
 
 & $BuildScript
 
+$TestScripts = @(Get-ChildItem -LiteralPath $PSScriptRoot -Filter "*.test.cjs" | ForEach-Object { $_.FullName })
+& node --test @TestScripts
+if ($LASTEXITCODE -ne 0) { throw "Source regression tests failed." }
+
+$PreviousDialogSource = $env:ARCHIVE_DIALOG_SOURCE
+try {
+  foreach ($Artifact in @("archive-explorer.html", "dist/index.html", "dist/index.self-extract.html")) {
+    $env:ARCHIVE_DIALOG_SOURCE = $Artifact
+    & node --test (Join-Path $PSScriptRoot "dialog-layout.test.cjs")
+    if ($LASTEXITCODE -ne 0) { throw "Dialog layout checks failed for $Artifact." }
+  }
+} finally {
+  $env:ARCHIVE_DIALOG_SOURCE = $PreviousDialogSource
+}
+
 $Errors = New-Object System.Collections.Generic.List[string]
 
 foreach ($Path in @($Source, $Readable, $SelfExtract)) {

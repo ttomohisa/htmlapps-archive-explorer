@@ -67,6 +67,7 @@ Smartphone:
 - Free-text search matches name/path within the current subtree.
 - Query shortcuts: `*.ext`, `ext:js`, `>10MB`, `<500KB`.
 - Additional filters: type, min/max size, encrypted-only, notes-only.
+- On smartphone widths, the advanced filter popover stays within the current viewport, including after resizing; its contents scroll when vertical space is limited.
 - Breadcrumb includes nested archive ancestry and folder ancestry.
 - Supported nested ZIP / 7z / RAR5 / TAR / GZIP / CAB / ISO / LZH archives can be opened in place and returned from.
 - Keyboard: Up/Down, Enter, Backspace, Space, Ctrl/Cmd+F.
@@ -148,6 +149,8 @@ Limits:
 - The language button shows the target as EN / JA, with a localized action label and tooltip.
 - The version badge uses `vMAJOR.MINOR.PATCH` and matches `app.config.json`.
 - The privacy badge reads 完全ローカル処理 / Fully local processing.
+- Help, manifest export and password dialogs fit the current viewport; only their bodies scroll, keeping titles and action controls visible. The Help body is keyboard-focusable.
+- Native modal dialogs prevent background page scrolling and restore it when closed.
 - light-only appearance
 
 ## Interaction links

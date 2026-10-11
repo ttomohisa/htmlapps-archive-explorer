@@ -62,7 +62,13 @@ Python, Node.js, and a local web server are not required. The builder uses Windo
 6. Open **Analysis** to inspect Archive Map, type distribution, and size/compression summaries.
 7. Select one or more extractable files and save them. Multiple selections are packaged into a new ZIP.
 
+### Dialogs on small screens
+
+Help, manifest export and password dialogs keep their titles and action controls visible on short screens while only their bodies scroll. In Help, focus the body with Tab and use the arrow/Page Up/Page Down keys to read it. Background page scrolling is paused while a native modal is open and returns when it closes.
+
 ### Search and filter recovery
+
+On narrow screens, the advanced filters stay inside the viewport when opened or resized. Scroll inside the popover on short screens to reach every control, including **Clear filters**.
 
 Search size shortcuts and the visible minimum/maximum size filters apply together: the higher minimum and lower maximum are used. Boundaries remain inclusive, so `>1KB` includes 1 KB and `<2KB` includes 2 KB. Conflicting bounds produce no matches.
 

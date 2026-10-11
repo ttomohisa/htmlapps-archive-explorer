@@ -67,6 +67,7 @@ Smartphone:
 - Free-text search matches name/path within the current subtree.
 - Query shortcuts: `*.ext`, `ext:js`, `>10MB`, `<500KB`.
 - Additional filters: type, min/max size, encrypted-only, notes-only.
+- On smartphone widths, the advanced filter popover stays within the current viewport, including after resizing; its contents scroll when vertical space is limited.
 - Breadcrumb includes nested archive ancestry and folder ancestry.
 - Supported nested ZIP / 7z / RAR5 / TAR / GZIP / CAB / ISO / LZH archives can be opened in place and returned from.
 - Keyboard: Up/Down, Enter, Backspace, Space, Ctrl/Cmd+F.

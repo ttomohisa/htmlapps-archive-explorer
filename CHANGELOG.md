@@ -4,6 +4,7 @@
 
 - Keep Help, manifest export and password titles/actions visible while their bodies scroll on short screens; make the Help body keyboard-focusable.
 - Prevent background page scrolling while a native modal dialog is open.
+- Keep mobile filters within the viewport when opened or resized, with internal scrolling on short screens.
 - Use a decorative shield for the fully local processing badge.
 - Add source and release-artifact dialog layout checks to the repository validation.
 

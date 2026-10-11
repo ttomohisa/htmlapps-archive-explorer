@@ -68,6 +68,8 @@ Help, manifest export and password dialogs keep their titles and action controls
 
 ### Search and filter recovery
 
+On narrow screens, the advanced filters stay inside the viewport when opened or resized. Scroll inside the popover on short screens to reach every control, including **Clear filters**.
+
 Search size shortcuts and the visible minimum/maximum size filters apply together: the higher minimum and lower maximum are used. Boundaries remain inclusive, so `>1KB` includes 1 KB and `<2KB` includes 2 KB. Conflicting bounds produce no matches.
 
 When a search or filter leaves no matching items, choose **Clear search and filters** in the empty list. This resets the search, type, minimum/maximum size, encrypted-only and notes-only controls while keeping the current folder, sort order, and selected files. Focus returns to search. The existing **Clear filters** control still clears only the advanced filters.

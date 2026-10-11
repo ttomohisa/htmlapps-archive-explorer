@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
+const vm = require('node:vm');
 const { gunzipSync } = require('node:zlib');
 
 const root = path.resolve(__dirname, '..');
@@ -17,9 +18,9 @@ const help = source.match(/<dialog\b[^>]*id="helpDialog"[^>]*>[\s\S]*?<\/dialog>
 
 // These source/artifact contracts complement real browser geometry and wheel checks.
 // Read declarations in source order so later rules cannot silently undo the repair.
-function declarations(selector) {
+function declarations(selector, stylesheet = css) {
   const result = {};
-  for (const [, selectors, body] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+  for (const [, selectors, body] of stylesheet.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
     if (!selectors.split(',').some(value => value.trim() === selector)) continue;
     for (const declaration of body.split(';')) {
       const colon = declaration.indexOf(':');
@@ -28,6 +29,122 @@ function declarations(selector) {
   }
   return result;
 }
+
+function mediaBlock(condition) {
+  const marker = `@media(${condition})`;
+  const start = css.indexOf(marker);
+  assert.ok(start >= 0, `${condition} breakpoint must exist`);
+  const opening = css.indexOf('{', start);
+  let depth = 1;
+  for (let end = opening + 1; end < css.length; end++) {
+    if (css[end] === '{') depth++;
+    if (css[end] === '}' && --depth === 0) return css.slice(opening + 1, end);
+  }
+  assert.fail(`Unclosed ${condition} breakpoint`);
+}
+
+const desktopCss = css.slice(0, css.indexOf('@media'));
+const mobileCss = mediaBlock('max-width:720px');
+const popoverAt = width => ({
+  ...declarations('.filter-popover', desktopCss),
+  ...(width <= 720 ? declarations('.filter-popover', mobileCss) : {}),
+});
+
+test('mobile filter popover is viewport-anchored with a short-height cap and safe bottom gap', () => {
+  const mobile = popoverAt(393);
+  assert.equal(mobile.position, 'fixed');
+  assert.equal(mobile.left, '14px');
+  assert.equal(mobile.right, '14px');
+  assert.equal(mobile.width, 'auto');
+  assert.equal(mobile.top, 'min(calc(var(--header-height) + 14px),30dvh)');
+  assert.equal(mobile['max-height'], 'calc(100dvh - min(calc(var(--header-height) + 14px),30dvh) - max(14px,env(safe-area-inset-bottom)))');
+  assert.match(mobileCss, /top:min\(calc\(var\(--header-height\) \+ 14px\),30vh\)/);
+  assert.match(mobileCss, /max-height:calc\(100vh - min\(calc\(var\(--header-height\) \+ 14px\),30vh\) - max\(14px,env\(safe-area-inset-bottom\)\)\)/);
+  assert.equal(declarations(':root', mobileCss)['--header-height'], '60px');
+  assert.equal(declarations('.header-inner', desktopCss)['min-height'], 'var(--header-height)');
+  assert.equal(declarations('*', desktopCss)['box-sizing'], 'border-box', 'height cap includes padding and borders');
+});
+
+test('mobile filters scroll internally and remain above the fixed navigation bar', () => {
+  const mobile = popoverAt(393);
+  assert.equal(mobile.overflow, 'auto');
+  assert.equal(mobile['overscroll-behavior'], 'contain');
+  assert.ok(Number(mobile['z-index']) > Number(declarations('.mobile-bar', mobileCss)['z-index']));
+});
+
+test('desktop filter placement and closed hidden state survive the responsive repair', () => {
+  const desktop = popoverAt(721);
+  assert.equal(desktop.position, 'absolute');
+  assert.equal(desktop.top, 'calc(100% + 7px)');
+  assert.equal(desktop.right, '0');
+  assert.equal(desktop.width, '260px');
+  assert.equal(desktop['z-index'], '25');
+  assert.equal(desktop['max-height'], undefined);
+  assert.equal(desktop.overflow, undefined);
+  assert.equal(declarations('.hidden', desktopCss).display, 'none!important');
+  assert.equal(declarations('.filter-popover', mobileCss).display, undefined);
+  assert.match(source, /class="filter-popover hidden" id="filterPopover"/);
+});
+
+function filterHarness() {
+  const nodes = {};
+  for (const id of ['filterBtn', 'filterPopover', 'filterCount', 'minSize', 'maxSize', 'encryptedOnly', 'warningOnly', 'clearFilters']) {
+    const classes = new Set(id === 'filterPopover' ? ['hidden'] : []);
+    nodes[id] = {
+      attributes: {}, textContent: '',
+      setAttribute(key, value) { this.attributes[key] = value; },
+      classList: {
+        contains: key => classes.has(key),
+        add: key => classes.add(key),
+        toggle(key, force) {
+          const enabled = force === undefined ? !classes.has(key) : force;
+          if (enabled) classes.add(key); else classes.delete(key);
+          return enabled;
+        },
+      },
+    };
+  }
+  const events = {};
+  const state = { filterMin: '', filterMax: '', encryptedOnly: false, warningOnly: false };
+  const context = vm.createContext({
+    state, $: selector => nodes[selector.slice(1)],
+    document: { addEventListener(name, callback) { events[name] = callback; } },
+    // Only open/close is exercised; listing and keyboard navigation have their own contracts.
+    syncFilterInputs() {}, renderFiles() {}, keyboardNavigate() {},
+  });
+  const badge = source.split('\n').find(line => line.startsWith('  function updateFilterBadge()'));
+  const handlers = source.split('\n').find(line => line.trimStart().startsWith("$('#filterBtn').onclick="));
+  assert.ok(badge && handlers, 'production filter event bindings must exist');
+  vm.runInContext(badge + '\n' + handlers, context);
+  const click = () => nodes.filterBtn.onclick({ stopPropagation() {} });
+  return { nodes, events, click };
+}
+
+test('open filters use the same unconditional breakpoint rules on desktop-to-mobile resize', () => {
+  const h = filterHarness();
+  h.click();
+  for (const [width, position] of [[1440, 'absolute'], [720, 'fixed'], [393, 'fixed'], [721, 'absolute']]) {
+    assert.equal(h.nodes.filterPopover.classList.contains('hidden'), false);
+    assert.equal(h.nodes.filterBtn.attributes['aria-expanded'], 'true');
+    assert.equal(popoverAt(width).position, position);
+    if (width <= 720) assert.equal(popoverAt(width).top, 'min(calc(var(--header-height) + 14px),30dvh)');
+  }
+});
+
+test('Escape and outside dismissal can reopen mobile filters without a stale static position', () => {
+  const h = filterHarness();
+  for (const dismiss of [() => h.events.keydown({ key: 'Escape' }), () => h.events.click()]) {
+    h.click();
+    assert.equal(h.nodes.filterBtn.attributes['aria-expanded'], 'true');
+    dismiss();
+    assert.equal(h.nodes.filterPopover.classList.contains('hidden'), true);
+    assert.equal(h.nodes.filterBtn.attributes['aria-expanded'], 'false');
+    h.click();
+    assert.equal(h.nodes.filterPopover.classList.contains('hidden'), false);
+    assert.equal(popoverAt(393).top, 'min(calc(var(--header-height) + 14px),30dvh)');
+    dismiss();
+  }
+});
 
 for (const [dialog, container] of [
   ['helpDialog', '#helpDialog'],

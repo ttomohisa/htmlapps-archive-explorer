@@ -1,14 +1,14 @@
 {
-  "generatedAt": "2026-10-11T07:36:10.0000000Z",
+  "generatedAt": "2026-10-12T07:17:20.0582988+09:00",
   "readable": {
     "path": "dist/index.html",
-    "bytes": 155758,
-    "mb": 0.149
+    "bytes": 155655,
+    "mb": 0.148
   },
   "selfExtract": {
     "path": "dist/index.self-extract.html",
-    "bytes": 57930,
-    "mb": 0.055
+    "bytes": 58670,
+    "mb": 0.056
   },
-  "gzipPayloadBytes": 42776
+  "gzipPayloadBytes": 43332
 }

@@ -225,3 +225,15 @@ test('each checked artifact contains the exact canonical source', () => {
   const canonical = fs.readFileSync(path.join(root, 'src/index.template.html'), 'utf8');
   assert.equal(source, canonical, `${input} is stale; synchronize release artifacts from source`);
 });
+
+test('phone layouts hide the informational footer without hiding archive navigation', () => {
+  assert.equal(declarations('footer', mobileCss).display, 'none');
+  assert.notEqual(declarations('footer', desktopCss).display, 'none');
+  assert.equal(declarations('.mobile-bar', mobileCss).display, 'grid');
+  assert.equal(declarations('.mobile-bar', mobileCss).position, 'fixed');
+  assert.match(declarations('main', desktopCss).padding, /92px$/,
+    'the file workspace must retain clearance for the fixed mobile action bar');
+  const footer = source.match(/<footer\b[^>]*>[\s\S]*?<\/footer>/)?.[0] || '';
+  assert.doesNotMatch(footer, /<(?:button|input|select)\b/,
+    'only informational content belongs in the hidden footer');
+});

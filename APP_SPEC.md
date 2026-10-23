@@ -61,6 +61,7 @@ Smartphone:
 - selecting a file switches the Explorer area to Inspector
 - Back returns to the list
 - bottom bar provides Explorer / Analysis / Notes / Save
+- at the existing 720px phone breakpoint, hide the informational page footer while keeping the bottom navigation and its workspace clearance; wider screens retain the footer
 
 ## Search / navigation
 

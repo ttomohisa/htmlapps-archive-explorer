@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Hide the informational footer on phone layouts while preserving archive navigation, workspace clearance, and the desktop footer.
+
 ## 1.0.3 - 2026-10-11
 
 - Keep Help, manifest export and password titles/actions visible while their bodies scroll on short screens; make the Help body keyboard-focusable.

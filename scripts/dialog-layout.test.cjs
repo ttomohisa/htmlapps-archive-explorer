@@ -201,8 +201,8 @@ test('Help scrolling is keyboard reachable and retains native dismissal controls
   assert.match(help, /<div class="dialog-body" tabindex="0"/);
   assert.match(help, /<h2 id="helpTitle"/);
   assert.match(help, /<dialog id="helpDialog" aria-labelledby="helpTitle">/);
-  assert.equal((help.match(/data-dialog-close/g) || []).length, 2);
-  assert.match(help, /data-i18n="close"/);
+  assert.equal((help.match(/data-dialog-close/g) || []).length, 1);
+  assert.match(help, /data-i18n-aria="close"/);
   assert.ok(source.includes("$('#helpBtn').onclick=()=>$('#helpDialog').showModal()"));
   assert.ok(source.includes("$$('[data-dialog-close]').forEach(b=>b.onclick=()=>$('#helpDialog').close())"));
 });
@@ -210,7 +210,8 @@ test('Help scrolling is keyboard reachable and retains native dismissal controls
 test('the local-processing badge uses a decorative shield and unchanged bilingual labels', () => {
   const badge = source.match(/<div class="local-badge">([\s\S]*?)<\/div>/)?.[1] || '';
   assert.match(badge, /<svg[^>]*aria-hidden="true"/);
-  assert.match(badge, /d="M12 3l8 3v6c0 5-8 9-8 9s-8-4-8-9V6l8-3z"/);
+  assert.match(badge, /d="M12 3 5 6v5c0 4\.6 2\.8 8 7 10 4\.2-2 7-5\.4 7-10V6z"/);
+    assert.match(badge, /d="m9 12 2 2 4-5"/);
   assert.doesNotMatch(badge, /M7 10V7a5 5/);
   assert.match(badge, /data-i18n="localOnly">完全ローカル処理<\/span>/);
   assert.ok(source.includes("localOnly:'Fully local processing'"));

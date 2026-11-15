@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.0.4 - 2026-11-15
+## 1.1.0 - 2026-11-15
 
 - Select folders recursively from the file list or desktop folder tree; show partial and unavailable states, deduplicate overlapping choices, and save folder-origin selections as ZIP even for a single remaining file.
 

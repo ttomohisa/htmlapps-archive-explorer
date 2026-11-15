@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-15T03:38:05.998Z",
+  "generatedAt": "2026-11-15T03:38:46.647Z",
   "readable": {
     "path": "dist/index.html",
     "bytes": 165721,
@@ -10,5 +10,5 @@
     "bytes": 61370,
     "mb": 0.059
   },
-  "gzipPayloadBytes": 45357
+  "gzipPayloadBytes": 45356
 }

@@ -419,7 +419,15 @@ var e=function(){"use strict";function r(e,r){postMessage({action:nr,cbn:r,resul
   }
   function findEOCD(view){
     const min=Math.max(0,view.byteLength-65557);
-    for(let i=view.byteLength-22;i>=min;i--)if(readU32(view,i)===0x06054b50)return i;
+    for(let i=view.byteLength-22;i>=min;i--){
+      if(readU32(view,i)!==0x06054b50)continue;
+      if(i+22+readU16(view,i+20)!==view.byteLength)continue;
+      const count=readU16(view,i+10),size=readU32(view,i+12),offset=readU32(view,i+16);
+      if(count!==0xffff&&size!==0xffffffff&&offset!==0xffffffff){
+        if(offset+size>i||count&&(offset+4>view.byteLength||readU32(view,offset)!==0x02014b50))continue;
+      }
+      return i;
+    }
     return -1
   }
   function decodeZipName(nameBytes,extraBytes,utf8){
@@ -444,9 +452,10 @@ var e=function(){"use strict";function r(e,r){postMessage({action:nr,cbn:r,resul
     let p=cdOffset,entries=[];
     for(let i=0;i<total&&p+46<=v.byteLength;i++){
       if(i%400===0){setPhase('phaseList',total?i/total*100:20);await new Promise(r=>setTimeout(r,0));if(gen!==state.generation)throw new Error('stale')}
-      if(readU32(v,p)!==0x02014b50)break;
+      if(readU32(v,p)!==0x02014b50)throw new Error('Invalid ZIP central directory');
       const flags=readU16(v,p+8),method=readU16(v,p+10),time=readU16(v,p+12),date=readU16(v,p+14),crc=readU32(v,p+16),comp=readU32(v,p+20),size=readU32(v,p+24);
       const nl=readU16(v,p+28),xl=readU16(v,p+30),cl=readU16(v,p+32),external=readU32(v,p+38),local=readU32(v,p+42);
+      if(p+46+nl+xl+cl>v.byteLength)throw new Error('Truncated ZIP central directory');
       const nb=u.slice(p+46,p+46+nl),xb=u.slice(p+46+nl,p+46+nl+xl);
       let path=cleanPath(decodeZipName(nb,xb,!!(flags&0x800)));
       const isDir=path.endsWith('/')||!!(external&0x10);
@@ -456,14 +465,23 @@ var e=function(){"use strict";function r(e,r){postMessage({action:nr,cbn:r,resul
       entry.getData=async(password)=>{
         if(entry.dir)return new Uint8Array();if(entry.unsupported)throw entry.encrypted?unsupportedEncryptionError():new Error('Unsupported ZIP method');
         const vv=new DataView(entry.zipBuffer);if(readU32(vv,entry.localOffset)!==0x04034b50)throw new Error('Invalid local header');
-        const nll=readU16(vv,entry.localOffset+26),xll=readU16(vv,entry.localOffset+28),start=entry.localOffset+30+nll+xll;let packed=new Uint8Array(entry.zipBuffer.slice(start,start+entry.compressedSize));
+        const nll=readU16(vv,entry.localOffset+26),xll=readU16(vv,entry.localOffset+28),start=entry.localOffset+30+nll+xll;
+        if(start+entry.compressedSize>vv.byteLength)throw new Error('Truncated ZIP file data');
+        let packed=new Uint8Array(entry.zipBuffer.slice(start,start+entry.compressedSize));
         if(entry.encrypted){if(!entry.passwordSupported)throw unsupportedEncryptionError();if(typeof password!=='string')throw badPasswordError();const check=(entry.flags&8)?((time>>>8)&255):((entry.crc32>>>24)&255);packed=decryptZipCrypto(packed,password,check)}
         let out;if(entry.method===0)out=packed;else out=await streamDecompress(new Blob([packed]),'deflate-raw');
-        if(entry.encrypted&&((out.length!==entry.size)||(crc32(out)!==(entry.crc32>>>0))))throw badPasswordError();return out
+        if(out.length!==entry.size||crc32(out)!==(entry.crc32>>>0)){
+          if(entry.encrypted)throw badPasswordError();
+          throw new Error('ZIP entry failed size/CRC32 verification');
+        }
+        return out
       };
-      entry.getDataRange=async(start=0,end=entry.size,password)=>{if(entry.dir)return new Uint8Array();if(entry.encrypted||entry.method!==0)return(await entry.getData(password)).slice(start,end);if(entry.unsupported)throw new Error('Unsupported ZIP method');const vv=new DataView(entry.zipBuffer);if(readU32(vv,entry.localOffset)!==0x04034b50)throw new Error('Invalid local header');const nll=readU16(vv,entry.localOffset+26),xll=readU16(vv,entry.localOffset+28),dataStart=entry.localOffset+30+nll+xll;return new Uint8Array(entry.zipBuffer.slice(dataStart+start,dataStart+Math.min(end,entry.size)))};
+      entry.getDataRange=async(start=0,end=entry.size,password)=>{if(entry.dir)return new Uint8Array();if(entry.encrypted||entry.method!==0)return(await entry.getData(password)).slice(start,end);if(entry.unsupported)throw new Error('Unsupported ZIP method');const vv=new DataView(entry.zipBuffer);if(readU32(vv,entry.localOffset)!==0x04034b50)throw new Error('Invalid local header');const nll=readU16(vv,entry.localOffset+26),xll=readU16(vv,entry.localOffset+28),dataStart=entry.localOffset+30+nll+xll;
+      if(dataStart+entry.compressedSize>vv.byteLength)throw new Error('Truncated ZIP file data');
+      return new Uint8Array(entry.zipBuffer.slice(dataStart+start,dataStart+Math.min(end,entry.size)))};
       entries.push(entry);p+=46+nl+xl+cl;
     }
+    if(entries.length!==total)throw new Error('Incomplete ZIP central directory');
     setPhase('phaseList',100);return entries;
   }
   async function parseTarBytes(bytes,gen){

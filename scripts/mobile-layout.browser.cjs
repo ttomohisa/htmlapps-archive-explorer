@@ -18,6 +18,68 @@ async function exerciseActions(page, width, label) {
   }
 }
 
+
+function testZip(records) {
+  let crcTable = null;
+  function crc32(bytes) {
+    if (!crcTable) crcTable = Array.from({length:256},(_,i)=>{
+      let c=i; for(let n=0;n<8;n++)c=(c>>>1)^((c&1)?0xedb88320:0);return c>>>0;
+    });
+    let crc=0xffffffff;
+    for(const byte of bytes)crc=(crc>>>8)^crcTable[(crc^byte)&255];
+    return (crc^0xffffffff)>>>0;
+  }
+  const local=[],central=[];let offset=0;
+  for(const record of records){
+    const name=Buffer.from(record.name,'utf8'),data=Buffer.from(record.data,'utf8'),crc=crc32(data);
+    const lh=Buffer.alloc(30),ch=Buffer.alloc(46);
+    lh.writeUInt32LE(0x04034b50,0);lh.writeUInt16LE(20,4);lh.writeUInt16LE(0x0800,6);
+    lh.writeUInt32LE(crc,14);lh.writeUInt32LE(data.length,18);lh.writeUInt32LE(data.length,22);lh.writeUInt16LE(name.length,26);
+    ch.writeUInt32LE(0x02014b50,0);ch.writeUInt16LE(20,4);ch.writeUInt16LE(20,6);ch.writeUInt16LE(0x0800,8);
+    ch.writeUInt32LE(crc,16);ch.writeUInt32LE(data.length,20);ch.writeUInt32LE(data.length,24);ch.writeUInt16LE(name.length,28);ch.writeUInt32LE(offset,42);
+    local.push(lh,name,data);central.push(ch,name);offset+=lh.length+name.length+data.length;
+  }
+  const centralSize=central.reduce((n,part)=>n+part.length,0),eocd=Buffer.alloc(22);
+  eocd.writeUInt32LE(0x06054b50,0);eocd.writeUInt16LE(records.length,8);eocd.writeUInt16LE(records.length,10);
+  eocd.writeUInt32LE(centralSize,12);eocd.writeUInt32LE(offset,16);
+  return Buffer.concat([...local,...central,eocd]);
+}
+
+async function exerciseFolderSelection(page,width,lang,label){
+  const fixture=testZip([
+    {name:'docs/a.txt',data:'A'},
+    {name:'docs/sub/b.txt',data:'B'},
+    {name:'docs/sub/c.txt',data:'C'},
+    {name:'docs-more/outside.txt',data:'OUTSIDE'},
+  ]);
+  await page.locator('#fileInput').setInputFiles({name:'folders.zip',mimeType:'application/zip',buffer:fixture});
+  const folder=page.locator('#fileList [data-select-folder="docs"]');
+  await folder.waitFor();
+  await folder.check();
+  assert.equal(await page.locator('#selectionText').textContent(),lang==='ja'?'3件選択':'3 selected',label+': folder selection count');
+  await page.locator('#fileList [data-open="docs"]').click();
+  const a=page.locator('#fileList [data-select]').first();
+  await a.uncheck();
+  await page.locator('#breadcrumb [data-crumb=""]').click();
+  assert.equal(await folder.evaluate(el=>el.indeterminate),true,label+': partial folder selection');
+  await folder.check();
+  assert.equal(await page.locator('#selectionText').textContent(),lang==='ja'?'3件選択':'3 selected',label+': no duplicates from reselection');
+  await folder.uncheck();
+  assert.equal(await page.locator('#selectionBar').isVisible(),false,label+': clear folder selection');
+  await page.locator('#fileList [data-open="docs"]').click();
+  await page.locator('#fileList [data-select-folder="docs/sub"]').check();
+  assert.equal(await page.locator('#selectionText').textContent(),lang==='ja'?'2件選択':'2 selected',label+': nested folder selection');
+  const pending=page.waitForEvent('download');
+  await page.locator(width<=PHONE_WIDTH?'#mobileSave':'#extractSelected').click();
+  const download=await pending;
+  assert.match(download.suggestedFilename(),/-selected\.zip$/,label+': folder exports as ZIP');
+  const bytes=await fs.promises.readFile(await download.path());
+  assert.equal(bytes.readUInt32LE(0),0x04034b50,label+': valid ZIP header');
+  const filename=bytes.subarray(30,30+bytes.readUInt16LE(26)).toString('utf8');
+  assert.equal(filename,'docs/sub/b.txt',label+': folder path preserved');
+  assert.equal(bytes.includes(Buffer.from('docs-more/outside.txt')),false,label+': sibling excluded');
+}
+
 async function main() {
   fs.mkdirSync(artifacts, {recursive:true});
   const browser = await chromium.launch();
@@ -56,6 +118,9 @@ async function main() {
         await page.locator(LANGUAGE).click();
         assert.equal(await page.locator('body > footer').isVisible(), width > PHONE_WIDTH, label + ': informational footer breakpoint');
         await exerciseActions(page, width, label);
+        if (file === 'dist/index.html' && ((language === 'ja' && width === 1360) || (language === 'en' && width === 393))) {
+          await exerciseFolderSelection(page,width,language,label);
+        }
         assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), label + ': page width');
         // Responsive changes must not leave the informational footer in a stale state.
         await page.setViewportSize({width:PHONE_WIDTH + 1, height});

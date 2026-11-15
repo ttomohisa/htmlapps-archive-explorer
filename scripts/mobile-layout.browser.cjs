@@ -57,10 +57,18 @@ async function exerciseFolderSelection(page,width,lang,label){
   await page.locator('#fileInput').setInputFiles({name:'folders.zip',mimeType:'application/zip',buffer:fixture});
   const folder=page.locator('#fileList [data-select-folder="docs"]');
   await folder.waitFor();
+  if(width<=PHONE_WIDTH){
+    const rect=await folder.evaluate(el=>el.parentElement.getBoundingClientRect().toJSON());
+    assert.ok(rect.width>=44&&rect.height>=44,label+': phone folder tap target at least 44px');
+  }
   await folder.check();
   assert.equal(await page.locator('#selectionText').textContent(),lang==='ja'?'3件選択':'3 selected',label+': folder selection count');
   await page.locator('#fileList [data-open="docs"]').click();
   const a=page.locator('#fileList [data-select]').first();
+  if(width<=PHONE_WIDTH){
+    const rect=await a.evaluate(el=>el.parentElement.getBoundingClientRect().toJSON());
+    assert.ok(rect.width>=44&&rect.height>=44,label+': phone file tap target at least 44px');
+  }
   await a.uncheck();
   await page.locator('#breadcrumb [data-crumb=""]').click();
   assert.equal(await folder.evaluate(el=>el.indeterminate),true,label+': partial folder selection');

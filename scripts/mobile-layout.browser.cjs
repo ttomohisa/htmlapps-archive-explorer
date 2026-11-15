@@ -69,6 +69,9 @@ async function exerciseFolderSelection(page,width,lang,label){
   await page.locator('#fileList [data-open="docs"]').click();
   await page.locator('#fileList [data-select-folder="docs/sub"]').check();
   assert.equal(await page.locator('#selectionText').textContent(),lang==='ja'?'2件選択':'2 selected',label+': nested folder selection');
+  await page.locator('#fileList [data-open="docs/sub"]').click();
+  await page.locator('#fileList [data-select]').last().uncheck();
+  assert.equal(await page.locator('#selectionText').textContent(),lang==='ja'?'1件選択':'1 selected',label+': individual exclusion from a selected folder');
   const pending=page.waitForEvent('download');
   await page.locator(width<=PHONE_WIDTH?'#mobileSave':'#extractSelected').click();
   const download=await pending;

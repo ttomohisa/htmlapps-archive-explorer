@@ -12,6 +12,7 @@ const artifacts = path.resolve('test-results/mobile-layout');
 async function exerciseActions(page, width, label) {
   await page.locator('#fileInput').setInputFiles({name:'mobile-layout.zip', mimeType:'application/zip', buffer:Buffer.from('UEsDBBQAAAAAAMyOV123NFxhJwAAACcAAAAKAAAAc2FtcGxlLnR4dFN5bnRoZXRpYyBsb2NhbCBtb2JpbGUtbGF5b3V0IGZpeHR1cmUuClBLAQIUAxQAAAAAAMyOV123NFxhJwAAACcAAAAKAAAAAAAAAAAAAACAAQAAAABzYW1wbGUudHh0UEsFBgAAAAABAAEAOAAAAE8AAAAAAA==', 'base64')});
   await page.locator('#appView').waitFor();
+  assert.equal(await page.locator('#fileInput').inputValue(), '', label + ': same file can be reselected');
   if (width <= PHONE_WIDTH) {
     assert.equal(await page.locator('#mobileBar').isVisible(), true, label + ': mobile navigation');
     for (const control of ['[data-mobile-view="explorerView"]','[data-mobile-view="analysisView"]','[data-mobile-view="safetyView"]','#mobileSave']) assert.equal(await page.locator(control).isVisible(), true, label + ': navigation action ' + control);
@@ -32,11 +33,12 @@ function testZip(records) {
   const local=[],central=[];let offset=0;
   for(const record of records){
     const name=Buffer.from(record.name,'utf8'),data=Buffer.from(record.data,'utf8'),crc=crc32(data);
+    const size=record.uncompressedSize??data.length,method=record.method??0,flags=0x800|(record.encrypted?1:0);
     const lh=Buffer.alloc(30),ch=Buffer.alloc(46);
-    lh.writeUInt32LE(0x04034b50,0);lh.writeUInt16LE(20,4);lh.writeUInt16LE(0x0800,6);
-    lh.writeUInt32LE(crc,14);lh.writeUInt32LE(data.length,18);lh.writeUInt32LE(data.length,22);lh.writeUInt16LE(name.length,26);
-    ch.writeUInt32LE(0x02014b50,0);ch.writeUInt16LE(20,4);ch.writeUInt16LE(20,6);ch.writeUInt16LE(0x0800,8);
-    ch.writeUInt32LE(crc,16);ch.writeUInt32LE(data.length,20);ch.writeUInt32LE(data.length,24);ch.writeUInt16LE(name.length,28);ch.writeUInt32LE(offset,42);
+    lh.writeUInt32LE(0x04034b50,0);lh.writeUInt16LE(20,4);lh.writeUInt16LE(flags,6);lh.writeUInt16LE(method,8);
+    lh.writeUInt32LE(crc,14);lh.writeUInt32LE(data.length,18);lh.writeUInt32LE(size,22);lh.writeUInt16LE(name.length,26);
+    ch.writeUInt32LE(0x02014b50,0);ch.writeUInt16LE(20,4);ch.writeUInt16LE(20,6);ch.writeUInt16LE(flags,8);ch.writeUInt16LE(method,10);
+    ch.writeUInt32LE(crc,16);ch.writeUInt32LE(data.length,20);ch.writeUInt32LE(size,24);ch.writeUInt16LE(name.length,28);ch.writeUInt32LE(offset,42);
     local.push(lh,name,data);central.push(ch,name);offset+=lh.length+name.length+data.length;
   }
   const centralSize=central.reduce((n,part)=>n+part.length,0),eocd=Buffer.alloc(22);
@@ -81,6 +83,56 @@ async function exerciseFolderSelection(page,width,lang,label){
   const filename=bytes.subarray(30,30+bytes.readUInt16LE(26)).toString('utf8');
   assert.equal(filename,'docs/sub/b.txt',label+': folder path preserved');
   assert.equal(bytes.includes(Buffer.from('docs-more/outside.txt')),false,label+': sibling excluded');
+}
+
+
+async function exerciseReleaseEdgeCases(page,lang,label){
+  const valid=testZip([{name:'fresh.txt',data:'fresh'}]);
+  const stale=testZip([{name:'old.txt',data:'old'}]);
+  await page.evaluate(({oldBytes,newBytes})=>{
+    const input=document.querySelector('#fileInput');
+    const original=File.prototype.arrayBuffer;
+    File.prototype.arrayBuffer=function(...args){
+      if(this.name==='old-slow.zip')return new Promise((resolve,reject)=>{
+        setTimeout(()=>original.apply(this,args).then(resolve,reject),170);
+      });
+      return original.apply(this,args);
+    };
+    const emit=(name,values)=>{
+      const list=new DataTransfer();
+      list.items.add(new File([new Uint8Array(values)],name,{type:'application/zip'}));
+      input.files=list.files;
+      input.dispatchEvent(new Event('change',{bubbles:true}));
+    };
+    emit('old-slow.zip',oldBytes);
+    setTimeout(()=>emit('fresh.zip',newBytes),30);
+    setTimeout(()=>{File.prototype.arrayBuffer=original},400);
+  },{oldBytes:[...stale],newBytes:[...valid]});
+  await page.waitForFunction(()=>document.querySelector('#archiveName')?.textContent==='fresh.zip'&&
+    document.querySelector('#fileList [data-select]')!=null,null,{timeout:10000});
+  await page.waitForTimeout(260);
+  assert.equal(await page.locator('#appView').isVisible(),true,label+': earlier archive must not clear replacement');
+  assert.equal(await page.locator('#archiveName').textContent(),'fresh.zip',label+': newest archive survives delayed ZIP');
+  assert.equal(await page.locator('#fileList .file-name').first().textContent(),'fresh.txt',label+': newest entry is visible');
+  assert.equal(await page.locator('#fileInput').inputValue(),'',label+': reselecting the same file is possible');
+
+  const encrypted=testZip([{name:'secrets.txt',data:'not-encrypted-on-purpose',encrypted:true}]);
+  await page.locator('#fileInput').setInputFiles({name:'password.zip',mimeType:'application/zip',buffer:encrypted});
+  await page.locator('#fileList [data-open]').first().click();
+  await page.locator('#passwordDialog').waitFor();
+  await page.locator('#fileInput').setInputFiles({name:'fresh.zip',mimeType:'application/zip',buffer:valid});
+  await page.waitForFunction(()=>document.querySelector('#archiveName')?.textContent==='fresh.zip'&&
+    document.querySelector('#fileList [data-select]')!=null,null,{timeout:10000});
+  assert.equal(await page.locator('#passwordDialog').isVisible(),false,label+': old password dialog is cancelled');
+  assert.equal(await page.locator('#archivePassword').inputValue(),'',label+': previous password input was cleared');
+
+  const huge=testZip([{name:'too-big.bin',data:'',method:8,uncompressedSize:80*1024*1024}]);
+  await page.locator('#fileInput').setInputFiles({name:'large-deflate.zip',mimeType:'application/zip',buffer:huge});
+  await page.locator('#fileList [data-open]').first().click();
+  await page.waitForFunction(()=>document.querySelector('#previewBox')?.textContent?.includes(
+    document.documentElement.lang==='ja'?'Hexプレビューを省略':'Hex preview is skipped'),null,{timeout:10000});
+  assert.ok((await page.locator('#previewBox').textContent()).includes(
+    lang==='ja'?'Hexプレビューを省略':'Hex preview is skipped'),label+': avoid full decompression for huge binary preview');
 }
 
 async function main() {
@@ -153,6 +205,9 @@ async function main() {
         await page.locator(HELP).click();
         await page.locator('#helpDialog').locator(CLOSE).first().click();
         assert.equal(await page.locator('#helpDialog').isVisible(), false, label + ': Help reopens and closes');
+        if (file === 'dist/index.html' && ((language === 'ja' && width === 1360) || (language === 'en' && width === 393))) {
+          await exerciseReleaseEdgeCases(page,language,label);
+        }
         assert.deepEqual(errors, [], label + ': console errors');
         assert.deepEqual(requests, [], label + ': no external runtime requests');
         console.log('PASS ' + label);

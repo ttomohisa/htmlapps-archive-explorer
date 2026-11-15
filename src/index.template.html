@@ -622,7 +622,7 @@ var e=function(){"use strict";function r(e,r){postMessage({action:nr,cbn:r,resul
 
 
   function archiveSnapshot(){return{file:state.file,type:state.type,entries:state.entries,cwd:state.cwd,active:state.active,selected:new Set(state.selected),selectedFolders:new Set(state.selectedFolders),expandedFolders:new Set(state.expandedFolders),search:state.search,typeFilter:state.typeFilter,warnings:state.warnings,duplicates:state.duplicates,sortKey:state.sortKey,sortDir:state.sortDir,filterMin:state.filterMin,filterMax:state.filterMax,encryptedOnly:state.encryptedOnly,warningOnly:state.warningOnly,analysisPath:state.analysisPath,archivePassword:state.archivePassword}}
-  function applySnapshot(snap){revokePreview();Object.assign(state,snap);state.selected=new Set(snap.selected);state.selectedFolders=new Set(snap.selectedFolders||[]);state.expandedFolders=new Set(snap.expandedFolders);state.virtualItems=[];state.virtualized=false;state.listContextKey='';state.virtualStart=-1;$('#searchInput').value=state.search;$('#typeFilter').value=state.typeFilter;syncFilterInputs();$('#archiveName').textContent=state.file.name;$('#archiveMeta').textContent=archiveMetaText();renderCapability();$('#appView').classList.remove('hidden');$('#emptyView').classList.add('hidden');$('#mobileBar').classList.remove('hidden');setPhase('phaseReady');renderAll();updateArchiveBack()}
+  function applySnapshot(snap){++state.generation;if(state.passwordPending)finishPasswordDialog(null);revokePreview();Object.assign(state,snap);state.selected=new Set(snap.selected);state.selectedFolders=new Set(snap.selectedFolders||[]);state.expandedFolders=new Set(snap.expandedFolders);state.virtualItems=[];state.virtualized=false;state.listContextKey='';state.virtualStart=-1;$('#searchInput').value=state.search;$('#typeFilter').value=state.typeFilter;syncFilterInputs();$('#archiveName').textContent=state.file.name;$('#archiveMeta').textContent=archiveMetaText();renderCapability();$('#appView').classList.remove('hidden');$('#emptyView').classList.add('hidden');$('#mobileBar').classList.remove('hidden');setPhase('phaseReady');renderAll();updateArchiveBack()}
   function restoreArchiveLevel(index){const snap=state.archiveStack[index];if(!snap)return;state.archiveStack=state.archiveStack.slice(0,index);applySnapshot(snap)}
   function updateArchiveBack(){$('#backArchiveBtn').classList.toggle('hidden',state.archiveStack.length===0)}
   function archiveMetaText(){if(!state.file)return'';const labels={cab:'CAB',iso:'ISO 9660',lzh:'LZH',rar:'RAR5',zip:'ZIP',tar:'TAR','7z':'7z (LZMA)'};const label=state.type==='gzip'?(state.entries.some(e=>e.source==='tar')?'TAR.GZ / TGZ':'GZIP'):(labels[state.type]||state.type.toUpperCase());return`${label} · ${fmtBytes(state.file.size)}`}
@@ -633,9 +633,42 @@ var e=function(){"use strict";function r(e,r){postMessage({action:nr,cbn:r,resul
   function resetPasswordDialog(){const d=$('#passwordDialog');if(!d)return;$('#archivePassword').value='';$('#archivePassword').type='password';$('#passwordError').textContent='';$('#passwordError').classList.add('hidden');$('#passwordToggle').setAttribute('aria-label',t('showPassword'))}
   function requestArchivePassword(e,{retry=false}={}){if(state.archivePassword&&!retry)return Promise.resolve(state.archivePassword);if(state.passwordPending)return state.passwordPending;const d=$('#passwordDialog');resetPasswordDialog();state.passwordEntry=e;$('#passwordTarget').textContent=t('passwordFor',e?.name||state.file?.name||'archive');if(retry){$('#passwordError').textContent=t('wrongPassword');$('#passwordError').classList.remove('hidden')}d.showModal();setTimeout(()=>$('#archivePassword').focus(),0);state.passwordPending=new Promise(resolve=>{state._passwordResolve=resolve});return state.passwordPending}
   function finishPasswordDialog(value){const d=$('#passwordDialog');if(d.open)d.close();const resolve=state._passwordResolve;state._passwordResolve=null;state.passwordPending=null;state.passwordEntry=null;resetPasswordDialog();if(resolve)resolve(value)}
-  async function entryData(e,{start=null,end=null}={}){if(!e)throw new Error('Missing entry');if(e.encrypted&&!e.passwordSupported)throw unsupportedEncryptionError();for(;;){let password=null;if(e.encrypted){password=state.archivePassword||await requestArchivePassword(e);if(password==null)throw passwordCancelledError()}try{const data=start!=null&&typeof e.getDataRange==='function'?await e.getDataRange(start,end??e.size,password):await e.getData(password);if(e.encrypted){state.archivePassword=password;renderCapability();renderFiles()}return data}catch(err){if(e.encrypted&&err?.code==='BAD_PASSWORD'){state.archivePassword=null;const retry=await requestArchivePassword(e,{retry:true});if(retry==null)throw passwordCancelledError();state.archivePassword=retry;continue}throw err}}}
+  function staleArchiveError(){const error=new Error('Archive changed during processing');error.code='STALE_ARCHIVE';return error}
+  function requireCurrentArchive(generation){if(generation!==state.generation)throw staleArchiveError()}
+  async function entryData(e,{start=null,end=null}={}){
+    if(!e)throw new Error('Missing entry');
+    if(e.encrypted&&!e.passwordSupported)throw unsupportedEncryptionError();
+    const generation=state.generation;
+    for(;;){
+      requireCurrentArchive(generation);
+      let password=null;
+      if(e.encrypted){
+        password=state.archivePassword||await requestArchivePassword(e);
+        requireCurrentArchive(generation);
+        if(password==null)throw passwordCancelledError();
+      }
+      try{
+        const data=start!=null&&typeof e.getDataRange==='function'
+          ?await e.getDataRange(start,end??e.size,password):await e.getData(password);
+        requireCurrentArchive(generation);
+        if(e.encrypted){state.archivePassword=password;renderCapability();renderFiles()}
+        return data;
+      }catch(err){
+        requireCurrentArchive(generation);
+        if(e.encrypted&&err?.code==='BAD_PASSWORD'){
+          state.archivePassword=null;
+          const retry=await requestArchivePassword(e,{retry:true});
+          requireCurrentArchive(generation);
+          if(retry==null)throw passwordCancelledError();
+          state.archivePassword=retry;
+          continue;
+        }
+        throw err;
+      }
+    }
+  }
   async function openArchive(file,opts={}){
-    const nested=!!opts.nested,gen=++state.generation;if(!nested){state.archiveStack=[];state.archivePassword=null}else state.archivePassword=null;
+    const nested=!!opts.nested,gen=++state.generation;if(state.passwordPending)finishPasswordDialog(null);if(!nested){state.archiveStack=[];state.archivePassword=null}else state.archivePassword=null;
     revokePreview(); state.file=file;state.entries=[];state.cwd='';state.active=null;state.selected.clear();state.selectedFolders.clear();state.warnings=[];state.duplicates=[];state.expandedFolders=new Set(['']);state.search='';state.typeFilter='all';state.sortKey='name';state.sortDir='asc';state.keyboardPath=null;state.inspectorTab='preview';state.analysisPath='';state.filterMin='';state.filterMax='';state.encryptedOnly=false;state.warningOnly=false;state.virtualItems=[];state.virtualized=false;state.listContextKey='';state.virtualStart=-1;
     $('#searchInput').value='';$('#typeFilter').value='all';syncFilterInputs();
     $('#emptyView').classList.add('hidden');$('#appView').classList.remove('hidden');$('#mobileBar').classList.remove('hidden');
@@ -646,14 +679,28 @@ var e=function(){"use strict";function r(e,r){postMessage({action:nr,cbn:r,resul
       if(gen!==state.generation)return;
       state.entries=entries.filter(e=>e.path).map((e,i)=>({...e,id:`entry-${gen}-${i}`}));$('#archiveMeta').textContent=archiveMetaText();renderCapability();renderStats();renderTree();renderBreadcrumb();renderFiles();renderInspector();showView('explorerView');
       setPhase('phaseAnalyze',30);await new Promise(r=>setTimeout(r,0));if(gen!==state.generation)return;
-      state.warnings=buildWarnings();setPhase('phaseAnalyze',65);await new Promise(r=>setTimeout(r,0));state.duplicates=buildDuplicates();renderAll();setPhase('phaseReady');updateArchiveBack();showToast(`${state.entries.filter(e=>!e.dir).length} ${t('files')}`);
+      state.warnings=buildWarnings();setPhase('phaseAnalyze',65);await new Promise(r=>setTimeout(r,0));if(gen!==state.generation)return;state.duplicates=buildDuplicates();renderAll();setPhase('phaseReady');updateArchiveBack();showToast(`${state.entries.filter(e=>!e.dir).length} ${t('files')}`);
     }catch(err){
+      if(gen!==state.generation)return;
       console.error(err);if(nested&&state.archiveStack.length){const snap=state.archiveStack.pop();applySnapshot(snap)}else resetToEmpty();
       if(err?.code==='UNSUPPORTED_ENCRYPTION'){showToast(t('encryptedArchiveUnsupported'),4500);return}const unsupported=err.message==='unsupported-format'||/Unsupported|Only LZMA/i.test(err.message||'');showToast(unsupported?t('unsupportedFormat'):t('invalidArchive'),4500);
     }
   }
   async function openNestedArchive(e){
-    if(!canOpenNested(e))return;try{showToast(t('saving'));const data=await entryData(e);const snap=archiveSnapshot();state.archiveStack.push(snap);const f=new File([data],e.name,{lastModified:e.modified?.getTime?.()||Date.now()});await openArchive(f,{nested:true})}catch(err){if(err?.code==='PASSWORD_CANCELLED'){showToast(t('passwordCancelled'));return}console.error(err);showToast(t('invalidArchive'),4000)}
+    if(!canOpenNested(e))return;
+    const generation=state.generation;
+    try{
+      showToast(t('saving'));
+      const data=await entryData(e);
+      requireCurrentArchive(generation);
+      const snap=archiveSnapshot();state.archiveStack.push(snap);
+      const f=new File([data],e.name,{lastModified:e.modified?.getTime?.()||Date.now()});
+      await openArchive(f,{nested:true});
+    }catch(err){
+      if(err?.code==='STALE_ARCHIVE')return;
+      if(err?.code==='PASSWORD_CANCELLED'){showToast(t('passwordCancelled'));return}
+      console.error(err);showToast(t('invalidArchive'),4000);
+    }
   }
   function canOpenNested(e){return !e.dir&&canExtractEntry(e)&&/\.(zip|tar|gz|tgz|cab|iso|lzh|lha|rar|7z)$/i.test(e.name)}
   function folderSet(){
@@ -827,7 +874,7 @@ var e=function(){"use strict";function r(e,r){postMessage({action:nr,cbn:r,resul
       state.virtualItems=[];state.virtualized=false;state.virtualStart=-1;host.classList.remove('virtualized');
       host.innerHTML=`<div class="empty-list">${esc(t('emptyFolder'))}${hasActiveListFilters()?`<div><button class="button small" type="button" data-clear-search-filters>${esc(t('clearSearchAndFilters'))}</button></div>`:''}</div>`;
       const reset=host.querySelector('[data-clear-search-filters]');if(reset)reset.onclick=clearSearchAndFilters;
-      updateSelectionBar();return
+      updateSelectionBar();updateSaveLabel();return
     }
     if(!state.keyboardPath||!items.some(e=>(e.dir?e.path:e.id)===state.keyboardPath))state.keyboardPath=items.length?(items[0].dir?items[0].path:items[0].id):null;
     const searching=hasActiveListFilters();state.virtualItems=items;state.virtualSearching=searching;state.virtualized=items.length>=VIRTUAL_THRESHOLD;state.virtualStart=-1;
@@ -871,7 +918,20 @@ var e=function(){"use strict";function r(e,r){postMessage({action:nr,cbn:r,resul
   }
   function safeFilename(name,fallback='download'){let n=String(name||'').replace(/[\\/:*?"<>|\x00-\x1f]/g,'_').trim().replace(/\.+$/,'');return n||fallback}
   function triggerDownload(blob,name){const a=document.createElement('a');const url=URL.createObjectURL(blob);a.href=url;a.download=safeFilename(name);document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),4000)}
-  async function downloadEntry(e){if(!canExtractEntry(e)){showToast(extractionBlockReason(e)||t('cannotExtract'));return}try{showToast(t('saving'));const d=await entryData(e);triggerDownload(new Blob([d]),e.name);showToast(t('savedToast'))}catch(err){if(err?.code==='PASSWORD_CANCELLED'){showToast(t('passwordCancelled'));return}console.error(err);showToast(t('previewFailed'))}}
+  async function downloadEntry(e){
+    if(!canExtractEntry(e)){showToast(extractionBlockReason(e)||t('cannotExtract'));return}
+    const generation=state.generation;
+    try{
+      showToast(t('saving'));
+      const data=await entryData(e);
+      requireCurrentArchive(generation);
+      triggerDownload(new Blob([data]),e.name);showToast(t('savedToast'));
+    }catch(err){
+      if(err?.code==='STALE_ARCHIVE')return;
+      if(err?.code==='PASSWORD_CANCELLED'){showToast(t('passwordCancelled'));return}
+      console.error(err);showToast(t('previewFailed'));
+    }
+  }
   function u16(n){return[n&255,(n>>8)&255]} function u32(n){return[n&255,(n>>8)&255,(n>>16)&255,(n>>24)&255]}
   function dosNow(d){d=d||new Date();const date=((Math.max(1980,d.getFullYear())-1980)<<9)|((d.getMonth()+1)<<5)|d.getDate();const time=(d.getHours()<<11)|(d.getMinutes()<<5)|(d.getSeconds()>>1);return{date,time}}
   function safeZipEntryPath(path){
@@ -880,11 +940,13 @@ var e=function(){"use strict";function r(e,r){postMessage({action:nr,cbn:r,resul
       .map(part=>part.replace(/[\x00-\x1f:*?"<>|]/g,'_').replace(/[. ]+$/g,'')||'_');
     return parts.join('/')||'file';
   }
-  async function buildStoredZip(entries){
+  async function buildStoredZip(entries,generation=state.generation){
     if(entries.length>65535)throw new Error('Too many selected files for ZIP32');
     const files=[],used=new Set(),encoder=new TextEncoder();
     for(const e of entries){
+      if(generation!==state.generation)throw staleArchiveError();
       const data=await entryData(e);
+      if(generation!==state.generation)throw staleArchiveError();
       let path=safeZipEntryPath(e.path);
       const key=name=>name.toLowerCase();
       if(used.has(key(path))){
@@ -908,13 +970,26 @@ var e=function(){"use strict";function r(e,r){postMessage({action:nr,cbn:r,resul
     const cdSize=centrals.reduce((a,x)=>a+x.length,0),count=files.length;
     if(cdSize>0xffffffff||offset+cdSize>0xffffffff)throw new Error('ZIP32 export limit exceeded');
     const end=new Uint8Array([80,75,5,6,0,0,0,0,...u16(count),...u16(count),...u32(cdSize),...u32(offset),0,0]);
+    if(generation!==state.generation)throw staleArchiveError();
     return new Blob([...locals,...centrals,end],{type:'application/zip'})
   }
   async function saveSelected(){
-    const es=state.entries.filter(e=>state.selected.has(e.id)&&canExtractEntry(e));if(!es.length){showToast(t('nothingSelected'));return}
-    try{showToast(t('saving'));if(es.length===1&&!state.selectedFolders.size){await downloadEntry(es[0]);return}
-      const blob=await buildStoredZip(es);const base=safeFilename(state.file.name.replace(/\.[^.]+$/,''),'archive');triggerDownload(blob,base+'-selected.zip');showToast(t('savedToast'))
-    }catch(err){if(err?.code==='PASSWORD_CANCELLED'){showToast(t('passwordCancelled'));return}console.error(err);showToast(t('previewFailed'))}
+    const generation=state.generation;
+    const es=state.entries.filter(e=>state.selected.has(e.id)&&canExtractEntry(e));
+    if(!es.length){showToast(t('nothingSelected'));return}
+    try{
+      showToast(t('saving'));
+      if(es.length===1&&!state.selectedFolders.size){await downloadEntry(es[0]);return}
+      const filename=state.file.name;
+      const blob=await buildStoredZip(es,generation);
+      requireCurrentArchive(generation);
+      const base=safeFilename(filename.replace(/\.[^.]+$/,''),'archive');
+      triggerDownload(blob,base+'-selected.zip');showToast(t('savedToast'));
+    }catch(err){
+      if(err?.code==='STALE_ARCHIVE')return;
+      if(err?.code==='PASSWORD_CANCELLED'){showToast(t('passwordCancelled'));return}
+      console.error(err);showToast(t('previewFailed'));
+    }
   }
   function manifestRows(){return state.entries.filter(e=>!e.dir).map(e=>({path:e.path,size:e.size,compressedSize:e.compressedSize,compressionRatio:ratio(e),modified:e.modified?e.modified.toISOString():null,method:methodName(e),crc32:e.crc32==null?null:(e.crc32>>>0).toString(16).padStart(8,'0'),encrypted:e.encrypted,extractable:canExtractEntry(e),unsupported:!!e.unsupported,type:classify(e.path)}))}
   function openExport(){
@@ -941,7 +1016,7 @@ var e=function(){"use strict";function r(e,r){postMessage({action:nr,cbn:r,resul
   function keyboardNavigate(e){if(!state.file||!$('#explorerView')||$('#explorerView').classList.contains('hidden'))return;if(e.target.matches('input,select,textarea,button')||document.querySelector('dialog[open]'))return;const items=filteredItems();if(!items.length)return;let i=Math.max(0,items.findIndex(x=>(x.dir?x.path:x.id)===state.keyboardPath));if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();i=Math.max(0,Math.min(items.length-1,i+(e.key==='ArrowDown'?1:-1)));state.keyboardPath=items[i].dir?items[i].path:items[i].id;renderFiles();ensureFileVisible(state.keyboardPath)}else if(e.key==='Enter'){e.preventDefault();const x=items[i];openPath(x.dir?x.path:x.id,x.dir)}else if(e.key==='Backspace'&&state.cwd){e.preventDefault();state.cwd=dirname(state.cwd);state.active=null;renderTree();renderBreadcrumb();renderFiles();renderInspector()}else if(e.key===' '){e.preventDefault();const x=items[i];if(!x.dir){state.active=x.id;state.inspectorTab='preview';renderFiles();renderInspector()}}}
   function bind(){
     $('#pickBtn').onclick=()=>$('#fileInput').click();$('#replaceBtn').onclick=()=>$('#fileInput').click();
-    $('#fileInput').onchange=e=>{const f=e.target.files?.[0];if(f)openArchive(f)};
+    $('#fileInput').onchange=e=>{const f=e.target.files?.[0];e.target.value='';if(f)openArchive(f)};
     $('#fileList').addEventListener('click',e=>{const b=e.target.closest('[data-open]');if(b)openPath(b.dataset.open,b.dataset.dir==='1')});$('#fileList').addEventListener('change',e=>{const folder=e.target.closest('[data-select-folder]');
       if(folder){if(!folder.disabled)toggleFolderSelection(folder.dataset.selectFolder,folder.checked);return}
       const c=e.target.closest('[data-select]');if(!c||c.disabled)return;

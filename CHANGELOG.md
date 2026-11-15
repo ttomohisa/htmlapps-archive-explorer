@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Verify ZIP entry CRC32 and uncompressed length before extraction, and reject truncated ZIP data or false end-of-directory signatures in comments.
+- Interpret PAX and GNU TAR long-name metadata without showing metadata headers as files; treat TAR link entries as non-extractable.
+- Distinguish entries with identical paths during selection, preview, keyboard navigation and extraction.
+- Remove unsafe path segments and resolve name collisions when packaging selected files into ZIP, with explicit ZIP32 export limits.
+- Show unavailable compression metadata for individual TAR.GZ entries rather than misleading 0% savings.
+- Add archive-fixture regression tests for these cases.
 - Hide the informational footer on phone layouts while preserving archive navigation, workspace clearance, and the desktop footer.
 
 ## 1.0.3 - 2026-10-11

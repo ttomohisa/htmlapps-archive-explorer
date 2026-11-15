@@ -26,7 +26,7 @@ GitHub Pages delivers only the initial HTML. After it loads, archive parsing, pr
 - **Find notable entries quickly** — Detect suspicious paths, absolute paths, executables/scripts, double extensions, extreme compression ratios, encrypted entries, and nested archives.
 - **Open nested archives in place** — Enter supported archives stored inside another archive and return to the parent without manually saving them first.
 - **Stay responsive on large archives** — Large file lists are virtualized while search, sort, filters, selection, and keyboard navigation still operate over the full result set.
-- **Extract only what you need** — Save one entry directly or package multiple selected entries into a new ZIP.
+- **Extract only what you need** — Save one entry directly or package multiple selected entries into a new ZIP. Paths are normalized and duplicate names are disambiguated in the new ZIP.
 - **Ask for passwords only when needed** — Traditional ZipCrypto ZIP passwords are requested only when encrypted bytes are needed, kept only in memory for the active archive, and never saved.
 
 ## Quick start

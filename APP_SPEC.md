@@ -13,7 +13,7 @@ Primary promise:
 - ZIP: Stored (method 0), Deflate (method 8), including traditional ZipCrypto encryption
 - 7z: single-folder / solid LZMA streams
 - RAR5: Stored entries
-- TAR
+- TAR: POSIX, PAX path/size/time metadata, and GNU long-name extensions
 - GZIP
 - TAR.GZ / TGZ
 - CAB: uncompressed folders
@@ -28,6 +28,7 @@ Known unsupported / partial:
 - 7z LZMA2, BCJ chains, multiple folders/coders: unsupported
 - RAR4 and compressed RAR5: unsupported
 - CAB MSZIP/LZX and compressed LZH methods: unsupported
+- TAR symlink/hardlink entries: visible, but not extractable
 
 ## Trust boundary
 
@@ -137,7 +138,7 @@ Limits:
 ## Export
 
 - one selected file: download original content
-- multiple selected files: create a Store-only ZIP with UTF-8 paths
+- multiple selected files: create a Store-only ZIP with UTF-8 paths, sanitize traversal/absolute paths and resolve filename collisions
 - manifest: JSON / CSV / TXT
 - output filename is user-editable for manifest export
 

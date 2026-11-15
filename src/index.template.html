@@ -485,17 +485,67 @@ var e=function(){"use strict";function r(e,r){postMessage({action:nr,cbn:r,resul
     setPhase('phaseList',100);return entries;
   }
   async function parseTarBytes(bytes,gen){
-    const entries=[];let o=0;
-    const text=(s,e)=>UTF8.decode(bytes.slice(s,e)).replace(/\0.*$/,'');
-    const oct=s=>{const x=s.replace(/\0.*$/,'').trim();return x?parseInt(x,8)||0:0};
-    let count=0;while(o+512<=bytes.length){
+    const entries=[];let o=0,count=0,globalPax={},localPax={},gnuName=null;
+    const field=(h,start,len)=>decodeBytes(h.slice(start,start+len)).replace(/\0.*$/,'');
+    const number=(h,start,len)=>{
+      const raw=h.slice(start,start+len);
+      if(raw[0]&0x80){
+        if(raw[0]&0x40)throw new Error('Invalid negative TAR size');
+        let value=raw[0]&0x3f;
+        for(let i=1;i<raw.length;i++)value=value*256+raw[i];
+        if(!Number.isSafeInteger(value))throw new Error('TAR size too large');
+        return value;
+      }
+      const value=field(h,start,len).trim();
+      if(!value)return 0;
+      if(!/^[0-7]+$/.test(value))throw new Error('Invalid TAR size');
+      const n=parseInt(value,8);
+      if(!Number.isSafeInteger(n))throw new Error('TAR size too large');
+      return n;
+    };
+    const paxRecords=data=>{
+      const props={};let pos=0;
+      while(pos<data.length){
+        let space=pos;
+        while(space<data.length&&data[space]!==32)space++;
+        const length=Number(UTF8.decode(data.slice(pos,space)));
+        if(!Number.isSafeInteger(length)||length<=space-pos+1||pos+length>data.length)throw new Error('Invalid TAR PAX record');
+        const record=UTF8.decode(data.slice(space+1,pos+length-1));
+        const equals=record.indexOf('=');
+        if(equals>=0)props[record.slice(0,equals)]=record.slice(equals+1);
+        pos+=length;
+      }
+      return props;
+    };
+    while(o+512<=bytes.length){
       if(count++%400===0){setPhase('phaseList',Math.min(99,o/Math.max(1,bytes.length)*100));await new Promise(r=>setTimeout(r,0));if(gen!==state.generation)throw new Error('stale')}
-      let empty=true;for(let i=0;i<512;i++){if(bytes[o+i]!==0){empty=false;break}} if(empty)break;
-      const name=text(o,o+100),prefix=text(o+345,o+500),path=cleanPath((prefix?prefix+'/':'')+name).replace(/\/+$/,'');
-      const size=oct(text(o+124,o+136)),mtime=oct(text(o+136,o+148)),flag=String.fromCharCode(bytes[o+156]||48),isDir=flag==='5'||name.endsWith('/');
-      const start=o+512; const entry={path,name:basename(path),dir:isDir,size:isDir?0:size,compressedSize:isDir?0:size,method:0,modified:mtime?new Date(mtime*1000):null,crc32:null,encrypted:false,source:'tar',tarBytes:bytes,dataOffset:start};
-      entry.getDataRange=async(start=0,end=entry.size)=>entry.tarBytes.slice(entry.dataOffset+start,entry.dataOffset+Math.min(end,entry.size));entry.getData=async()=>entry.getDataRange(0,entry.size);
-      if(path)entries.push(entry); o=start+Math.ceil(size/512)*512;
+      const h=bytes.subarray(o,o+512);
+      if(h.every(b=>b===0))break;
+      const name=field(h,0,100),prefix=field(h,345,155),rawPath=(prefix?prefix+'/':'')+name,flag=String.fromCharCode(h[156]||48);
+      const headerSize=number(h,124,12),mtime=number(h,136,12),start=o+512;
+      if(headerSize>bytes.length-start)throw new Error('Truncated TAR data');
+      const data=bytes.subarray(start,start+headerSize);
+      if(flag==='x'){localPax={...localPax,...paxRecords(data)}}
+      else if(flag==='g'){globalPax={...globalPax,...paxRecords(data)}}
+      else if(flag==='L'){gnuName=decodeBytes(data).replace(/\0.*$/,'').replace(/\n$/,'')}
+      else if(flag!=='K'){
+        const pax={...globalPax,...localPax};
+        const fullName=pax.path||gnuName||rawPath;
+        const path=cleanPath(fullName).replace(/\/+$/,'');
+        const isDir=flag==='5'||fullName.endsWith('/');
+        const isLink=flag==='1'||flag==='2';
+        const actualSize=pax.size===undefined?headerSize:Number(pax.size);
+        if(!Number.isSafeInteger(actualSize)||actualSize<0||actualSize>bytes.length-start)throw new Error('Invalid TAR PAX size');
+        const modified=pax.mtime!==undefined?new Date(Number(pax.mtime)*1000):mtime?new Date(mtime*1000):null;
+        const entry={path,name:basename(path),dir:isDir,size:isDir?0:actualSize,compressedSize:isDir?0:actualSize,method:0,modified:modified&&!Number.isNaN(modified.getTime())?modified:null,crc32:null,encrypted:false,source:'tar',unsupported:isLink,tarBytes:bytes,dataOffset:start};
+        entry.getDataRange=async(from=0,to=entry.size)=>{if(entry.unsupported)throw new Error('TAR links are not extractable');return entry.tarBytes.slice(entry.dataOffset+from,entry.dataOffset+Math.min(to,entry.size))};
+        entry.getData=async()=>entry.getDataRange(0,entry.size);
+        if(path)entries.push(entry);
+        localPax={};gnuName=null;
+        o=start+Math.ceil(actualSize/512)*512;
+        continue;
+      }
+      o=start+Math.ceil(headerSize/512)*512;
     }
     setPhase('phaseList',100);return entries;
   }
@@ -503,7 +553,11 @@ var e=function(){"use strict";function r(e,r){postMessage({action:nr,cbn:r,resul
   async function parseTar(file,gen){const bytes=new Uint8Array(await file.arrayBuffer());if(gen!==state.generation)throw new Error('stale');return parseTarBytes(bytes,gen)}
   async function parseGzip(file,gen){
     const bytes=await streamDecompress(file,'gzip'); if(gen!==state.generation)throw new Error('stale');
-    if(isTar(bytes))return parseTarBytes(bytes,gen);
+    if(isTar(bytes)){
+      const entries=await parseTarBytes(bytes,gen);
+      for(const entry of entries)if(!entry.dir)entry.compressedSize=null;
+      return entries;
+    }
     const outName=file.name.replace(/\.gz$/i,'')||'content';
     const e={path:outName,name:outName,dir:false,size:bytes.length,compressedSize:file.size,method:8,modified:new Date(file.lastModified),crc32:crc32(bytes),encrypted:false,source:'gzip',gzipBytes:bytes};
     e.getDataRange=async(start=0,end=e.size)=>e.gzipBytes.slice(start,Math.min(end,e.size));e.getData=async()=>e.gzipBytes; return[e]

@@ -419,7 +419,15 @@ var e=function(){"use strict";function r(e,r){postMessage({action:nr,cbn:r,resul
   }
   function findEOCD(view){
     const min=Math.max(0,view.byteLength-65557);
-    for(let i=view.byteLength-22;i>=min;i--)if(readU32(view,i)===0x06054b50)return i;
+    for(let i=view.byteLength-22;i>=min;i--){
+      if(readU32(view,i)!==0x06054b50)continue;
+      if(i+22+readU16(view,i+20)!==view.byteLength)continue;
+      const count=readU16(view,i+10),size=readU32(view,i+12),offset=readU32(view,i+16);
+      if(count!==0xffff&&size!==0xffffffff&&offset!==0xffffffff){
+        if(offset+size!==i||count&&(offset+4>view.byteLength||readU32(view,offset)!==0x02014b50))continue;
+      }
+      return i;
+    }
     return -1
   }
   function decodeZipName(nameBytes,extraBytes,utf8){
@@ -444,9 +452,10 @@ var e=function(){"use strict";function r(e,r){postMessage({action:nr,cbn:r,resul
     let p=cdOffset,entries=[];
     for(let i=0;i<total&&p+46<=v.byteLength;i++){
       if(i%400===0){setPhase('phaseList',total?i/total*100:20);await new Promise(r=>setTimeout(r,0));if(gen!==state.generation)throw new Error('stale')}
-      if(readU32(v,p)!==0x02014b50)break;
+      if(readU32(v,p)!==0x02014b50)throw new Error('Invalid ZIP central directory');
       const flags=readU16(v,p+8),method=readU16(v,p+10),time=readU16(v,p+12),date=readU16(v,p+14),crc=readU32(v,p+16),comp=readU32(v,p+20),size=readU32(v,p+24);
       const nl=readU16(v,p+28),xl=readU16(v,p+30),cl=readU16(v,p+32),external=readU32(v,p+38),local=readU32(v,p+42);
+      if(p+46+nl+xl+cl>v.byteLength)throw new Error('Truncated ZIP central directory');
       const nb=u.slice(p+46,p+46+nl),xb=u.slice(p+46+nl,p+46+nl+xl);
       let path=cleanPath(decodeZipName(nb,xb,!!(flags&0x800)));
       const isDir=path.endsWith('/')||!!(external&0x10);
@@ -456,28 +465,87 @@ var e=function(){"use strict";function r(e,r){postMessage({action:nr,cbn:r,resul
       entry.getData=async(password)=>{
         if(entry.dir)return new Uint8Array();if(entry.unsupported)throw entry.encrypted?unsupportedEncryptionError():new Error('Unsupported ZIP method');
         const vv=new DataView(entry.zipBuffer);if(readU32(vv,entry.localOffset)!==0x04034b50)throw new Error('Invalid local header');
-        const nll=readU16(vv,entry.localOffset+26),xll=readU16(vv,entry.localOffset+28),start=entry.localOffset+30+nll+xll;let packed=new Uint8Array(entry.zipBuffer.slice(start,start+entry.compressedSize));
+        const nll=readU16(vv,entry.localOffset+26),xll=readU16(vv,entry.localOffset+28),start=entry.localOffset+30+nll+xll;
+        if(start+entry.compressedSize>vv.byteLength)throw new Error('Truncated ZIP file data');
+        let packed=new Uint8Array(entry.zipBuffer.slice(start,start+entry.compressedSize));
         if(entry.encrypted){if(!entry.passwordSupported)throw unsupportedEncryptionError();if(typeof password!=='string')throw badPasswordError();const check=(entry.flags&8)?((time>>>8)&255):((entry.crc32>>>24)&255);packed=decryptZipCrypto(packed,password,check)}
         let out;if(entry.method===0)out=packed;else out=await streamDecompress(new Blob([packed]),'deflate-raw');
-        if(entry.encrypted&&((out.length!==entry.size)||(crc32(out)!==(entry.crc32>>>0))))throw badPasswordError();return out
+        if(out.length!==entry.size||crc32(out)!==(entry.crc32>>>0)){
+          if(entry.encrypted)throw badPasswordError();
+          throw new Error('ZIP entry failed size/CRC32 verification');
+        }
+        return out
       };
-      entry.getDataRange=async(start=0,end=entry.size,password)=>{if(entry.dir)return new Uint8Array();if(entry.encrypted||entry.method!==0)return(await entry.getData(password)).slice(start,end);if(entry.unsupported)throw new Error('Unsupported ZIP method');const vv=new DataView(entry.zipBuffer);if(readU32(vv,entry.localOffset)!==0x04034b50)throw new Error('Invalid local header');const nll=readU16(vv,entry.localOffset+26),xll=readU16(vv,entry.localOffset+28),dataStart=entry.localOffset+30+nll+xll;return new Uint8Array(entry.zipBuffer.slice(dataStart+start,dataStart+Math.min(end,entry.size)))};
+      entry.getDataRange=async(start=0,end=entry.size,password)=>{if(entry.dir)return new Uint8Array();if(entry.encrypted||entry.method!==0)return(await entry.getData(password)).slice(start,end);if(entry.unsupported)throw new Error('Unsupported ZIP method');const vv=new DataView(entry.zipBuffer);if(readU32(vv,entry.localOffset)!==0x04034b50)throw new Error('Invalid local header');const nll=readU16(vv,entry.localOffset+26),xll=readU16(vv,entry.localOffset+28),dataStart=entry.localOffset+30+nll+xll;
+      if(dataStart+entry.compressedSize>vv.byteLength)throw new Error('Truncated ZIP file data');
+      return new Uint8Array(entry.zipBuffer.slice(dataStart+start,dataStart+Math.min(end,entry.size)))};
       entries.push(entry);p+=46+nl+xl+cl;
     }
+    if(entries.length!==total)throw new Error('Incomplete ZIP central directory');
     setPhase('phaseList',100);return entries;
   }
   async function parseTarBytes(bytes,gen){
-    const entries=[];let o=0;
-    const text=(s,e)=>UTF8.decode(bytes.slice(s,e)).replace(/\0.*$/,'');
-    const oct=s=>{const x=s.replace(/\0.*$/,'').trim();return x?parseInt(x,8)||0:0};
-    let count=0;while(o+512<=bytes.length){
+    const entries=[];let o=0,count=0,globalPax={},localPax={},gnuName=null;
+    const field=(h,start,len)=>decodeBytes(h.slice(start,start+len)).replace(/\0.*$/,'');
+    const number=(h,start,len)=>{
+      const raw=h.slice(start,start+len);
+      if(raw[0]&0x80){
+        if(raw[0]&0x40)throw new Error('Invalid negative TAR size');
+        let value=raw[0]&0x3f;
+        for(let i=1;i<raw.length;i++)value=value*256+raw[i];
+        if(!Number.isSafeInteger(value))throw new Error('TAR size too large');
+        return value;
+      }
+      const value=field(h,start,len).trim();
+      if(!value)return 0;
+      if(!/^[0-7]+$/.test(value))throw new Error('Invalid TAR size');
+      const n=parseInt(value,8);
+      if(!Number.isSafeInteger(n))throw new Error('TAR size too large');
+      return n;
+    };
+    const paxRecords=data=>{
+      const props={};let pos=0;
+      while(pos<data.length){
+        let space=pos;
+        while(space<data.length&&data[space]!==32)space++;
+        const length=Number(UTF8.decode(data.slice(pos,space)));
+        if(!Number.isSafeInteger(length)||length<=space-pos+1||pos+length>data.length)throw new Error('Invalid TAR PAX record');
+        const record=UTF8.decode(data.slice(space+1,pos+length-1));
+        const equals=record.indexOf('=');
+        if(equals>=0)props[record.slice(0,equals)]=record.slice(equals+1);
+        pos+=length;
+      }
+      return props;
+    };
+    while(o+512<=bytes.length){
       if(count++%400===0){setPhase('phaseList',Math.min(99,o/Math.max(1,bytes.length)*100));await new Promise(r=>setTimeout(r,0));if(gen!==state.generation)throw new Error('stale')}
-      let empty=true;for(let i=0;i<512;i++){if(bytes[o+i]!==0){empty=false;break}} if(empty)break;
-      const name=text(o,o+100),prefix=text(o+345,o+500),path=cleanPath((prefix?prefix+'/':'')+name).replace(/\/+$/,'');
-      const size=oct(text(o+124,o+136)),mtime=oct(text(o+136,o+148)),flag=String.fromCharCode(bytes[o+156]||48),isDir=flag==='5'||name.endsWith('/');
-      const start=o+512; const entry={path,name:basename(path),dir:isDir,size:isDir?0:size,compressedSize:isDir?0:size,method:0,modified:mtime?new Date(mtime*1000):null,crc32:null,encrypted:false,source:'tar',tarBytes:bytes,dataOffset:start};
-      entry.getDataRange=async(start=0,end=entry.size)=>entry.tarBytes.slice(entry.dataOffset+start,entry.dataOffset+Math.min(end,entry.size));entry.getData=async()=>entry.getDataRange(0,entry.size);
-      if(path)entries.push(entry); o=start+Math.ceil(size/512)*512;
+      const h=bytes.subarray(o,o+512);
+      if(h.every(b=>b===0))break;
+      const name=field(h,0,100),prefix=field(h,345,155),rawPath=(prefix?prefix+'/':'')+name,flag=String.fromCharCode(h[156]||48);
+      const headerSize=number(h,124,12),mtime=number(h,136,12),start=o+512;
+      if(headerSize>bytes.length-start)throw new Error('Truncated TAR data');
+      const data=bytes.subarray(start,start+headerSize);
+      if(flag==='x'){localPax={...localPax,...paxRecords(data)}}
+      else if(flag==='g'){globalPax={...globalPax,...paxRecords(data)}}
+      else if(flag==='L'){gnuName=decodeBytes(data).replace(/\0.*$/,'').replace(/\n$/,'')}
+      else if(flag!=='K'){
+        const pax={...globalPax,...localPax};
+        const fullName=pax.path||gnuName||rawPath;
+        const path=cleanPath(fullName).replace(/\/+$/,'');
+        const isDir=flag==='5'||fullName.endsWith('/');
+        const isLink=flag==='1'||flag==='2';
+        const actualSize=pax.size===undefined?headerSize:Number(pax.size);
+        if(!Number.isSafeInteger(actualSize)||actualSize<0||actualSize>bytes.length-start)throw new Error('Invalid TAR PAX size');
+        const modified=pax.mtime!==undefined?new Date(Number(pax.mtime)*1000):mtime?new Date(mtime*1000):null;
+        const entry={path,name:basename(path),dir:isDir,size:isDir?0:actualSize,compressedSize:isDir?0:actualSize,method:0,modified:modified&&!Number.isNaN(modified.getTime())?modified:null,crc32:null,encrypted:false,source:'tar',unsupported:isLink,tarBytes:bytes,dataOffset:start};
+        entry.getDataRange=async(from=0,to=entry.size)=>{if(entry.unsupported)throw new Error('TAR links are not extractable');return entry.tarBytes.slice(entry.dataOffset+from,entry.dataOffset+Math.min(to,entry.size))};
+        entry.getData=async()=>entry.getDataRange(0,entry.size);
+        if(path)entries.push(entry);
+        localPax={};gnuName=null;
+        o=start+Math.ceil(actualSize/512)*512;
+        continue;
+      }
+      o=start+Math.ceil(headerSize/512)*512;
     }
     setPhase('phaseList',100);return entries;
   }
@@ -485,7 +553,11 @@ var e=function(){"use strict";function r(e,r){postMessage({action:nr,cbn:r,resul
   async function parseTar(file,gen){const bytes=new Uint8Array(await file.arrayBuffer());if(gen!==state.generation)throw new Error('stale');return parseTarBytes(bytes,gen)}
   async function parseGzip(file,gen){
     const bytes=await streamDecompress(file,'gzip'); if(gen!==state.generation)throw new Error('stale');
-    if(isTar(bytes))return parseTarBytes(bytes,gen);
+    if(isTar(bytes)){
+      const entries=await parseTarBytes(bytes,gen);
+      for(const entry of entries)if(!entry.dir)entry.compressedSize=null;
+      return entries;
+    }
     const outName=file.name.replace(/\.gz$/i,'')||'content';
     const e={path:outName,name:outName,dir:false,size:bytes.length,compressedSize:file.size,method:8,modified:new Date(file.lastModified),crc32:crc32(bytes),encrypted:false,source:'gzip',gzipBytes:bytes};
     e.getDataRange=async(start=0,end=e.size)=>e.gzipBytes.slice(start,Math.min(end,e.size));e.getData=async()=>e.gzipBytes; return[e]
@@ -571,7 +643,7 @@ var e=function(){"use strict";function r(e,r){postMessage({action:nr,cbn:r,resul
       const type=await sniff(file);if(type==='unsupported')throw new Error('unsupported-format');state.type=type;setPhase('phaseList',10);let entries;
       if(type==='zip')entries=await parseZip(file,gen);else if(type==='tar')entries=await parseTar(file,gen);else if(type==='gzip')entries=await parseGzip(file,gen);else if(type==='cab')entries=await parseCab(file,gen);else if(type==='iso')entries=await parseIso(file,gen);else if(type==='lzh')entries=await parseLzh(file,gen);else if(type==='rar')entries=await parseRar(file,gen);else if(type==='7z')entries=await parse7z(file,gen);else throw new Error('unsupported-format');
       if(gen!==state.generation)return;
-      state.entries=entries.filter(e=>e.path);$('#archiveMeta').textContent=archiveMetaText();renderCapability();renderStats();renderTree();renderBreadcrumb();renderFiles();renderInspector();showView('explorerView');
+      state.entries=entries.filter(e=>e.path).map((e,i)=>({...e,id:`entry-${gen}-${i}`}));$('#archiveMeta').textContent=archiveMetaText();renderCapability();renderStats();renderTree();renderBreadcrumb();renderFiles();renderInspector();showView('explorerView');
       setPhase('phaseAnalyze',30);await new Promise(r=>setTimeout(r,0));if(gen!==state.generation)return;
       state.warnings=buildWarnings();setPhase('phaseAnalyze',65);await new Promise(r=>setTimeout(r,0));state.duplicates=buildDuplicates();renderAll();setPhase('phaseReady');updateArchiveBack();showToast(`${state.entries.filter(e=>!e.dir).length} ${t('files')}`);
     }catch(err){
@@ -664,7 +736,7 @@ var e=function(){"use strict";function r(e,r){postMessage({action:nr,cbn:r,resul
     $$('#breadcrumb [data-archive-level]').forEach(b=>b.onclick=()=>restoreArchiveLevel(Number(b.dataset.archiveLevel)));
     $$('#breadcrumb [data-crumb]').forEach(b=>b.onclick=()=>{state.cwd=b.dataset.crumb;state.active=null;state.keyboardPath=null;renderTree();renderBreadcrumb();renderFiles();renderInspector()})
   }
-  function entryHasWarning(e){return state.warnings.some(w=>w.arr.some(x=>x.path===e.path))}
+  function entryHasWarning(e){return state.warnings.some(w=>w.arr.includes(e))}
   function parseSearchQuery(q){const out={terms:[],ext:null,min:null,max:null};for(const raw of q.trim().split(/\s+/).filter(Boolean)){const low=raw.toLowerCase();if(low.startsWith('ext:'))out.ext=low.slice(4).replace(/^\./,'');else if(/^\*\.[a-z0-9]+$/i.test(low))out.ext=low.slice(2);else if(/^[<>]/.test(low)){const n=parseSizeValue(low.slice(1));if(n!=null){if(low[0]==='>')out.min=n;else out.max=n}}else out.terms.push(low)}return out}
   function hasActiveListFilters(){return !!(state.search.trim()||state.typeFilter!=='all'||state.filterMin||state.filterMax||state.encryptedOnly||state.warningOnly)}
   function clearSearchAndFilters(){
@@ -686,12 +758,12 @@ var e=function(){"use strict";function r(e,r){postMessage({action:nr,cbn:r,resul
   const VIRTUAL_THRESHOLD=250,VIRTUAL_OVERSCAN=8;
   function fileRowHeight(){return matchMedia('(max-width:720px)').matches?58:45}
   function fileListContextKey(){return [state.cwd,state.search,state.typeFilter,state.filterMin,state.filterMax,state.encryptedOnly,state.warningOnly,state.sortKey,state.sortDir].join('\u0001')}
-  function rowHtml(e,searching){const k=e.dir?'folder':classify(e.path),extras=[];if(searching&&!e.dir&&dirname(e.path)!==state.cwd)extras.push(dirname(e.path));if(e.dir)extras.push(`${descendantCount(e.path)} ${t('files')}`);else if(k==='archive')extras.push(t('typeArchive'));if(e.encrypted)extras.push(e.passwordSupported?(state.archivePassword?t('entryUnlocked'):t('entryPassword')):t('entryEncryptionUnsupported'));else if(e.unsupported)extras.push(t('entryUnsupported'));if(entryHasWarning(e))extras.push('!');const blocked=!e.dir&&!canExtractEntry(e),status=e.encrypted?`<span class="entry-state locked">${esc(e.passwordSupported?(state.archivePassword?t('entryUnlocked'):t('entryPassword')):t('entryEncryptionUnsupported'))}</span>`:e.unsupported?`<span class="entry-state">${esc(t('entryUnsupported'))}</span>`:'';return `<div class="file-row ${state.active===e.path?'active':''} ${state.keyboardPath===e.path?'keyboard':''}" data-row-path="${esc(e.path)}">
-        <div>${e.dir?'':`<input class="select-box" type="checkbox" data-select="${esc(e.path)}" ${state.selected.has(e.path)?'checked':''} ${blocked?'disabled':''} aria-label="${esc(e.name)}" title="${blocked?esc(extractionBlockReason(e)):esc(e.name)}">`}</div>
-        <button type="button" class="file-main" data-open="${esc(e.path)}" data-dir="${e.dir?'1':'0'}"><span class="${e.dir?'folder-icon':'file-icon'}">${icon(k)}</span><span class="file-name">${esc(e.name)}${status}<span class="file-sub">${esc(extras.join(' · '))}</span></span></button>
+  function rowHtml(e,searching){const k=e.dir?'folder':classify(e.path),extras=[];if(searching&&!e.dir&&dirname(e.path)!==state.cwd)extras.push(dirname(e.path));if(e.dir)extras.push(`${descendantCount(e.path)} ${t('files')}`);else if(k==='archive')extras.push(t('typeArchive'));if(e.encrypted)extras.push(e.passwordSupported?(state.archivePassword?t('entryUnlocked'):t('entryPassword')):t('entryEncryptionUnsupported'));else if(e.unsupported)extras.push(t('entryUnsupported'));if(entryHasWarning(e))extras.push('!');const blocked=!e.dir&&!canExtractEntry(e),status=e.encrypted?`<span class="entry-state locked">${esc(e.passwordSupported?(state.archivePassword?t('entryUnlocked'):t('entryPassword')):t('entryEncryptionUnsupported'))}</span>`:e.unsupported?`<span class="entry-state">${esc(t('entryUnsupported'))}</span>`:'';return `<div class="file-row ${state.active===e.id?'active':''} ${state.keyboardPath===(e.dir?e.path:e.id)?'keyboard':''}" data-row-path="${esc(e.dir?e.path:e.id)}">
+        <div>${e.dir?'':`<input class="select-box" type="checkbox" data-select="${esc(e.id)}" ${state.selected.has(e.id)?'checked':''} ${blocked?'disabled':''} aria-label="${esc(e.name)}" title="${blocked?esc(extractionBlockReason(e)):esc(e.name)}">`}</div>
+        <button type="button" class="file-main" data-open="${esc(e.dir?e.path:e.id)}" data-dir="${e.dir?'1':'0'}"><span class="${e.dir?'folder-icon':'file-icon'}">${icon(k)}</span><span class="file-name">${esc(e.name)}${status}<span class="file-sub">${esc(extras.join(' · '))}</span></span></button>
         <div class="size-cell">${e.dir?fmtBytes(folderSize(e.path)):fmtBytes(e.size)}</div><div class="ratio-cell">${e.dir?'':fmtRatio(ratio(e))}</div></div>`}
   function renderVirtualWindow(force=false){if(!state.virtualized)return;const host=$('#fileList'),items=state.virtualItems,h=fileRowHeight(),view=host.clientHeight||534,top=host.scrollTop,start=Math.max(0,Math.floor(top/h)-VIRTUAL_OVERSCAN),end=Math.min(items.length,Math.ceil((top+view)/h)+VIRTUAL_OVERSCAN);if(!force&&start===state.virtualStart)return;state.virtualStart=start;const box=host.querySelector('.virtual-items');if(!box)return;box.style.transform=`translateY(${start*h}px)`;box.innerHTML=items.slice(start,end).map(e=>rowHtml(e,state.virtualSearching)).join('')}
-  function ensureFileVisible(path){if(!path)return;const host=$('#fileList'),items=state.virtualItems.length?state.virtualItems:filteredItems(),idx=items.findIndex(x=>x.path===path);if(idx<0)return;if(state.virtualized){const h=fileRowHeight(),top=idx*h,bottom=top+h;if(top<host.scrollTop)host.scrollTop=top;else if(bottom>host.scrollTop+host.clientHeight)host.scrollTop=Math.max(0,bottom-host.clientHeight);renderVirtualWindow(true)}else document.querySelector(`[data-row-path="${CSS.escape(path)}"]`)?.scrollIntoView({block:'nearest'})}
+  function ensureFileVisible(path){if(!path)return;const host=$('#fileList'),items=state.virtualItems.length?state.virtualItems:filteredItems(),idx=items.findIndex(x=>(x.dir?x.path:x.id)===path);if(idx<0)return;if(state.virtualized){const h=fileRowHeight(),top=idx*h,bottom=top+h;if(top<host.scrollTop)host.scrollTop=top;else if(bottom>host.scrollTop+host.clientHeight)host.scrollTop=Math.max(0,bottom-host.clientHeight);renderVirtualWindow(true)}else document.querySelector(`[data-row-path="${CSS.escape(path)}"]`)?.scrollIntoView({block:'nearest'})}
   function renderFiles(){
     const items=filteredItems(),host=$('#fileList');$$('[data-sort]').forEach(b=>{b.classList.toggle('active',b.dataset.sort===state.sortKey);b.textContent=t(b.dataset.sort==='name'?'name':b.dataset.sort==='size'?'sizeShort':'ratioShort')+(b.dataset.sort===state.sortKey?(state.sortDir==='asc'?' ↑':' ↓'):'')});
     const ctx=fileListContextKey(),contextChanged=ctx!==state.listContextKey;state.listContextKey=ctx;if(contextChanged)host.scrollTop=0;
@@ -701,7 +773,7 @@ var e=function(){"use strict";function r(e,r){postMessage({action:nr,cbn:r,resul
       const reset=host.querySelector('[data-clear-search-filters]');if(reset)reset.onclick=clearSearchAndFilters;
       updateSelectionBar();return
     }
-    if(!state.keyboardPath||!items.some(e=>e.path===state.keyboardPath))state.keyboardPath=items[0]?.path||null;
+    if(!state.keyboardPath||!items.some(e=>(e.dir?e.path:e.id)===state.keyboardPath))state.keyboardPath=items.length?(items[0].dir?items[0].path:items[0].id):null;
     const searching=hasActiveListFilters();state.virtualItems=items;state.virtualSearching=searching;state.virtualized=items.length>=VIRTUAL_THRESHOLD;state.virtualStart=-1;
     if(state.virtualized){const h=fileRowHeight();host.classList.add('virtualized');host.innerHTML=`<div class="virtual-space" style="height:${items.length*h}px"><div class="virtual-items"></div></div>`;renderVirtualWindow(true)}else{host.classList.remove('virtualized');host.innerHTML=items.map(e=>rowHtml(e,searching)).join('')}
     updateSelectionBar();updateSaveLabel()
@@ -710,12 +782,12 @@ var e=function(){"use strict";function r(e,r){postMessage({action:nr,cbn:r,resul
   function updateSelectionBar(){const n=state.selected.size;$('#selectionBar').classList.toggle('hidden',n===0);$('#selectionText').textContent=t('selectedCount',n)}
   function updateSaveLabel(){const n=state.selected.size;$('#mobileSave').title=n?t('selectedCount',n):t('nothingSelected')}
   function revokePreview(){if(state.previewUrl){URL.revokeObjectURL(state.previewUrl);state.previewUrl=null}}
-  function fileWarnings(e){return state.warnings.filter(w=>w.arr.some(x=>x.path===e.path))}
+  function fileWarnings(e){return state.warnings.filter(w=>w.arr.includes(e))}
   function magicType(bytes){const b=bytes;if(b.length>=8&&b[0]===0x89&&String.fromCharCode(...b.slice(1,4))==='PNG')return'PNG image';if(b.length>=3&&b[0]===0xff&&b[1]===0xd8&&b[2]===0xff)return'JPEG image';if(b.length>=6&&['GIF87a','GIF89a'].includes(String.fromCharCode(...b.slice(0,6))))return'GIF image';if(b.length>=5&&String.fromCharCode(...b.slice(0,5))==='%PDF-')return'PDF';if(b.length>=4&&b[0]===0x50&&b[1]===0x4b)return'ZIP';if(b.length>=6&&b[0]===0x37&&b[1]===0x7a&&b[2]===0xbc&&b[3]===0xaf&&b[4]===0x27&&b[5]===0x1c)return'7z';if(b.length>=4&&String.fromCharCode(...b.slice(0,4))==='Rar!')return'RAR';if(b.length>=4&&String.fromCharCode(...b.slice(0,4))==='MSCF')return'CAB';if(b.length>=2&&b[0]===0x1f&&b[1]===0x8b)return'GZIP';if(b.length>=4&&b[0]===0x7f&&String.fromCharCode(...b.slice(1,4))==='ELF')return'ELF executable';if(b.length>=2&&b[0]===0x4d&&b[1]===0x5a)return'PE / DOS executable';if(b.length>=12&&String.fromCharCode(...b.slice(0,4))==='RIFF'&&String.fromCharCode(...b.slice(8,12))==='WEBP')return'WebP image';return t('unknownBinary')}
   function hexDump(bytes){const lines=[];for(let o=0;o<bytes.length;o+=16){const part=bytes.slice(o,o+16),hex=[...part].map(x=>x.toString(16).padStart(2,'0').toUpperCase()).join(' '),ascii=[...part].map(x=>x>=32&&x<=126?String.fromCharCode(x):'.').join('');lines.push(`${o.toString(16).padStart(8,'0').toUpperCase()}  ${hex.padEnd(47,' ')}  |${ascii.padEnd(16,' ')}|`)}return lines.join('\n')}
   function renderHexPreview(bytes,e){const detected=magicType(bytes);return `<div class="hex-wrap"><div class="hex-meta"><strong>${esc(t('hexPreview'))}</strong><span>${esc(t('hexShowing',bytes.length))}</span><span>·</span><span>${esc(t('detectedType'))}: <strong>${esc(detected)}</strong></span></div><pre class="hex-dump">${esc(hexDump(bytes))}</pre></div>`}
   async function renderInspector(){
-    revokePreview();const host=$('#inspector'),path=state.active,e=state.entries.find(x=>x.path===path&&!x.dir);
+    revokePreview();const host=$('#inspector'),id=state.active,e=state.entries.find(x=>x.id===id&&!x.dir);
     if(!e){host.innerHTML=`<div class="inspector-empty">${esc(t('selectFile'))}</div>`;return}
     const notes=fileWarnings(e),noteCount=notes.length,gen=state.generation;const mod=e.modified?new Intl.DateTimeFormat(state.lang==='ja'?'ja-JP':'en-US',{dateStyle:'medium',timeStyle:'short'}).format(e.modified):'-';
     host.innerHTML=`<div class="inspector-tabs"><button class="inspector-tab ${state.inspectorTab==='preview'?'active':''}" data-inspect-tab="preview">${esc(t('preview'))}</button><button class="inspector-tab ${state.inspectorTab==='details'?'active':''}" data-inspect-tab="details">${esc(t('details'))}</button><button class="inspector-tab ${state.inspectorTab==='notes'?'active':''}" data-inspect-tab="notes">${esc(t('notes'))}${noteCount?` (${noteCount})`:''}</button></div><div class="inspect-body"><div class="inspect-title">${esc(e.name)}</div><div class="inspect-path">${esc(e.path)}</div>
@@ -725,7 +797,7 @@ var e=function(){"use strict";function r(e,r){postMessage({action:nr,cbn:r,resul
       <div class="inspect-actions"><button class="button primary small" id="extractOne" type="button" ${canExtractEntry(e)?'':`disabled title="${esc(extractionBlockReason(e)||t('cannotExtract'))}"`}>${esc(canExtractEntry(e)?t('extract'):t('cannotExtract'))}</button></div></div>`;
     $$('#inspector [data-inspect-tab]').forEach(b=>b.onclick=()=>{state.inspectorTab=b.dataset.inspectTab;renderInspector()});$('#extractOne').onclick=()=>{if(canExtractEntry(e))downloadEntry(e)};if($('#openNested'))$('#openNested').onclick=()=>openNestedArchive(e);
     if(state.inspectorTab!=='preview')return;const box=$('#previewBox'),kind=classify(e.path);
-    try{if(!canExtractEntry(e)){box.innerHTML=`<div class="preview-message">${esc(extractionBlockReason(e)||t('noPreview'))}</div>`;return}if(kind==='other'){const max=4096;if(!e.getDataRange&&e.size>64*1024*1024){box.innerHTML=`<div class="preview-message">${esc(t('hexTooLarge'))}</div>`;return}const data=await entryData(e,{start:0,end:Math.min(max,e.size)});if(gen!==state.generation||state.active!==path||state.inspectorTab!=='preview')return;box.innerHTML=renderHexPreview(data,e);return}const limit=(kind==='image'?20:kind==='text'||kind==='code'?4:0)*1024*1024;if(!limit){box.innerHTML=`<div class="preview-message">${esc(t('noPreview'))}</div>`;return}if(e.size>limit){box.innerHTML=`<div class="preview-message">${esc(t('tooLargePreview'))}</div>`;return}const data=await entryData(e);if(gen!==state.generation||state.active!==path||state.inspectorTab!=='preview')return;if(kind==='image'){const mime={png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',gif:'image/gif',webp:'image/webp',bmp:'image/bmp',avif:'image/avif',ico:'image/x-icon'}[extOf(e.path)]||'application/octet-stream';state.previewUrl=URL.createObjectURL(new Blob([data],{type:mime}));box.innerHTML=`<img src="${state.previewUrl}" alt="${esc(e.name)}">`}else{let txt=UTF8.decode(data);if(txt.length>150000)txt=txt.slice(0,150000)+'\n…';box.innerHTML=`<pre>${esc(txt)}</pre>`}}catch(err){if(err?.code==='PASSWORD_CANCELLED'){box.innerHTML=`<div class="preview-message">${esc(t('passwordCancelled'))}</div>`;return}console.error(err);box.innerHTML=`<div class="preview-message">${esc(t('previewFailed'))}</div>`}
+    try{if(!canExtractEntry(e)){box.innerHTML=`<div class="preview-message">${esc(extractionBlockReason(e)||t('noPreview'))}</div>`;return}if(kind==='other'){const max=4096;if(!e.getDataRange&&e.size>64*1024*1024){box.innerHTML=`<div class="preview-message">${esc(t('hexTooLarge'))}</div>`;return}const data=await entryData(e,{start:0,end:Math.min(max,e.size)});if(gen!==state.generation||state.active!==id||state.inspectorTab!=='preview')return;box.innerHTML=renderHexPreview(data,e);return}const limit=(kind==='image'?20:kind==='text'||kind==='code'?4:0)*1024*1024;if(!limit){box.innerHTML=`<div class="preview-message">${esc(t('noPreview'))}</div>`;return}if(e.size>limit){box.innerHTML=`<div class="preview-message">${esc(t('tooLargePreview'))}</div>`;return}const data=await entryData(e);if(gen!==state.generation||state.active!==id||state.inspectorTab!=='preview')return;if(kind==='image'){const mime={png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',gif:'image/gif',webp:'image/webp',bmp:'image/bmp',avif:'image/avif',ico:'image/x-icon'}[extOf(e.path)]||'application/octet-stream';state.previewUrl=URL.createObjectURL(new Blob([data],{type:mime}));box.innerHTML=`<img src="${state.previewUrl}" alt="${esc(e.name)}">`}else{let txt=UTF8.decode(data);if(txt.length>150000)txt=txt.slice(0,150000)+'\n…';box.innerHTML=`<pre>${esc(txt)}</pre>`}}catch(err){if(err?.code==='PASSWORD_CANCELLED'){box.innerHTML=`<div class="preview-message">${esc(t('passwordCancelled'))}</div>`;return}console.error(err);box.innerHTML=`<div class="preview-message">${esc(t('previewFailed'))}</div>`}
   }
   function typeLabel(k){return t({image:'typeImage',text:'typeText',code:'typeCode',archive:'typeArchive',pdf:'typePdf',other:'typeOther'}[k]||'typeOther')}
   function renderAnalysis(){
@@ -736,32 +808,54 @@ var e=function(){"use strict";function r(e,r){postMessage({action:nr,cbn:r,resul
   }
   function renderTreemap(){const aggs=childAggregates(state.analysisPath).slice(0,18),sum=aggs.reduce((a,x)=>a+x.size,0)||1;$('#mapBreadcrumb').textContent=state.analysisPath?`${state.file.name} › ${state.analysisPath.split('/').join(' › ')}`:state.file.name;$('#mapUp').classList.toggle('hidden',!state.analysisPath);$('#treemap').innerHTML=aggs.length?aggs.map(x=>`<button class="treeblock" type="button" data-map-path="${esc(x.path)}" data-map-dir="${x.dir?'1':'0'}" style="flex:${Math.max(1,x.size/sum*100)} 1 0"><span>${esc(x.name)}<small>${fmtBytes(x.size)}</small></span></button>`).join(''):`<div class="empty-list">${esc(t('none'))}</div>`;$$('#treemap [data-map-path]').forEach(b=>b.onclick=()=>{if(b.dataset.mapDir==='1'){state.analysisPath=b.dataset.mapPath;renderTreemap()}else jumpToEntry(b.dataset.mapPath)})}
   function bar(name,f,val){return `<div class="bar-row"><span class="bar-label" title="${esc(name)}">${esc(name)}</span><div class="bar-track"><div class="bar-fill" style="width:${Math.max(2,Math.min(100,f*100))}%"></div></div><span class="bar-value">${esc(val)}</span></div>`}
-  function jumpToEntry(path){const e=state.entries.find(x=>x.path===path&&!x.dir);if(!e)return;state.search='';state.typeFilter='all';state.filterMin=state.filterMax='';state.encryptedOnly=state.warningOnly=false;$('#searchInput').value='';$('#typeFilter').value='all';syncFilterInputs();state.cwd=dirname(e.path);state.active=e.path;state.keyboardPath=e.path;state.inspectorTab='preview';let d=state.cwd;while(d){state.expandedFolders.add(d);d=dirname(d)}showView('explorerView');$('#explorer').classList.remove('inspector-collapsed');state.rightCollapsed=false;syncPaneState();renderTree();renderBreadcrumb();renderFiles();renderInspector();setTimeout(()=>ensureFileVisible(e.path),0)}
+  function jumpToEntry(key){const e=state.entries.find(x=>x.id===key&&!x.dir)||state.entries.find(x=>x.path===key&&!x.dir);if(!e)return;state.search='';state.typeFilter='all';state.filterMin=state.filterMax='';state.encryptedOnly=state.warningOnly=false;$('#searchInput').value='';$('#typeFilter').value='all';syncFilterInputs();state.cwd=dirname(e.path);state.active=e.id;state.keyboardPath=e.id;state.inspectorTab='preview';let d=state.cwd;while(d){state.expandedFolders.add(d);d=dirname(d)}showView('explorerView');$('#explorer').classList.remove('inspector-collapsed');state.rightCollapsed=false;syncPaneState();renderTree();renderBreadcrumb();renderFiles();renderInspector();setTimeout(()=>ensureFileVisible(e.id),0)}
   function renderSafety(){
-    const host=$('#noticeList');if(!state.warnings.length)host.innerHTML=`<div class="analysis-section ok-card">${icon('ok')}<h3>${esc(t('safetyOk'))}</h3><p class="muted">${esc(t('safetyOkDesc'))}</p></div>`;else host.innerHTML=state.warnings.map(w=>{const title=t('warn'+w.kind),desc=t('warn'+w.kind+'Desc');return `<div class="notice ${w.tone}"><div class="notice-title">${icon('warn')}<span>${esc(title)} · ${w.arr.length}</span></div><p>${esc(desc)}</p><div class="notice-paths">${w.arr.slice(0,10).map(e=>`<button class="path-chip" type="button" data-jump="${esc(e.path)}" title="${esc(e.path)}">${esc(e.path)}</button>`).join('')}${w.arr.length>10?`<span class="hint">+${w.arr.length-10}</span>`:''}</div></div>`}).join('');
-    $('#duplicateList').innerHTML=state.duplicates.length?state.duplicates.slice(0,20).map(g=>`<div class="dup-group"><strong>${g.length} × ${fmtBytes(g[0].size)}</strong><div>${g.map(e=>`<button class="dup-path" type="button" data-jump="${esc(e.path)}">${esc(e.path)}</button>`).join('')}</div></div>`).join(''):`<div class="muted">${esc(t('noDuplicates'))}</div>`;$$('[data-jump]').forEach(b=>b.onclick=()=>jumpToEntry(b.dataset.jump))
+    const host=$('#noticeList');if(!state.warnings.length)host.innerHTML=`<div class="analysis-section ok-card">${icon('ok')}<h3>${esc(t('safetyOk'))}</h3><p class="muted">${esc(t('safetyOkDesc'))}</p></div>`;else host.innerHTML=state.warnings.map(w=>{const title=t('warn'+w.kind),desc=t('warn'+w.kind+'Desc');return `<div class="notice ${w.tone}"><div class="notice-title">${icon('warn')}<span>${esc(title)} · ${w.arr.length}</span></div><p>${esc(desc)}</p><div class="notice-paths">${w.arr.slice(0,10).map(e=>`<button class="path-chip" type="button" data-jump="${esc(e.id)}" title="${esc(e.path)}">${esc(e.path)}</button>`).join('')}${w.arr.length>10?`<span class="hint">+${w.arr.length-10}</span>`:''}</div></div>`}).join('');
+    $('#duplicateList').innerHTML=state.duplicates.length?state.duplicates.slice(0,20).map(g=>`<div class="dup-group"><strong>${g.length} × ${fmtBytes(g[0].size)}</strong><div>${g.map(e=>`<button class="dup-path" type="button" data-jump="${esc(e.id)}">${esc(e.path)}</button>`).join('')}</div></div>`).join(''):`<div class="muted">${esc(t('noDuplicates'))}</div>`;$$('[data-jump]').forEach(b=>b.onclick=()=>jumpToEntry(b.dataset.jump))
   }
   function safeFilename(name,fallback='download'){let n=String(name||'').replace(/[\\/:*?"<>|\x00-\x1f]/g,'_').trim().replace(/\.+$/,'');return n||fallback}
   function triggerDownload(blob,name){const a=document.createElement('a');const url=URL.createObjectURL(blob);a.href=url;a.download=safeFilename(name);document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),4000)}
   async function downloadEntry(e){if(!canExtractEntry(e)){showToast(extractionBlockReason(e)||t('cannotExtract'));return}try{showToast(t('saving'));const d=await entryData(e);triggerDownload(new Blob([d]),e.name);showToast(t('savedToast'))}catch(err){if(err?.code==='PASSWORD_CANCELLED'){showToast(t('passwordCancelled'));return}console.error(err);showToast(t('previewFailed'))}}
   function u16(n){return[n&255,(n>>8)&255]} function u32(n){return[n&255,(n>>8)&255,(n>>16)&255,(n>>24)&255]}
   function dosNow(d){d=d||new Date();const date=((Math.max(1980,d.getFullYear())-1980)<<9)|((d.getMonth()+1)<<5)|d.getDate();const time=(d.getHours()<<11)|(d.getMinutes()<<5)|(d.getSeconds()>>1);return{date,time}}
+  function safeZipEntryPath(path){
+    const parts=cleanPath(String(path||'').replace(/^[A-Za-z]:/,'')).split('/')
+      .filter(part=>part&&part!=='.'&&part!=='..')
+      .map(part=>part.replace(/[\x00-\x1f:*?"<>|]/g,'_').replace(/[. ]+$/g,'')||'_');
+    return parts.join('/')||'file';
+  }
   async function buildStoredZip(entries){
-    const files=[];for(const e of entries){const data=await entryData(e);files.push({e,data,crc:crc32(data),name:new TextEncoder().encode(cleanPath(e.path))})}
+    if(entries.length>65535)throw new Error('Too many selected files for ZIP32');
+    const files=[],used=new Set(),encoder=new TextEncoder();
+    for(const e of entries){
+      const data=await entryData(e);
+      let path=safeZipEntryPath(e.path);
+      const key=name=>name.toLowerCase();
+      if(used.has(key(path))){
+        const slash=path.lastIndexOf('/'),dir=path.slice(0,slash+1),base=path.slice(slash+1),dot=base.lastIndexOf('.'),stem=dot>0?base.slice(0,dot):base,ext=dot>0?base.slice(dot):'';
+        for(let n=2;;n++){const candidate=dir+stem+'-'+n+ext;if(!used.has(key(candidate))){path=candidate;break}}
+      }
+      used.add(key(path));
+      const name=encoder.encode(path);
+      if(data.length>0xffffffff||name.length>65535)throw new Error('ZIP32 export limit exceeded');
+      files.push({e,data,crc:crc32(data),name});
+    }
     let offset=0,locals=[],centrals=[];
     for(const f of files){
       const dt=dosNow(f.e.modified),nl=f.name.length;
       const lh=new Uint8Array([80,75,3,4,20,0,0,8,0,0,...u16(dt.time),...u16(dt.date),...u32(f.crc),...u32(f.data.length),...u32(f.data.length),...u16(nl),0,0,...f.name]);
       locals.push(lh,f.data);
       const ch=new Uint8Array([80,75,1,2,20,0,20,0,0,8,0,0,...u16(dt.time),...u16(dt.date),...u32(f.crc),...u32(f.data.length),...u32(f.data.length),...u16(nl),0,0,0,0,0,0,0,0,0,0,0,0,...u32(offset),...f.name]);
-      centrals.push(ch);offset+=lh.length+f.data.length
+      centrals.push(ch);offset+=lh.length+f.data.length;
+      if(offset>0xffffffff)throw new Error('ZIP32 export limit exceeded')
     }
     const cdSize=centrals.reduce((a,x)=>a+x.length,0),count=files.length;
+    if(cdSize>0xffffffff||offset+cdSize>0xffffffff)throw new Error('ZIP32 export limit exceeded');
     const end=new Uint8Array([80,75,5,6,0,0,0,0,...u16(count),...u16(count),...u32(cdSize),...u32(offset),0,0]);
     return new Blob([...locals,...centrals,end],{type:'application/zip'})
   }
   async function saveSelected(){
-    const es=state.entries.filter(e=>state.selected.has(e.path)&&canExtractEntry(e));if(!es.length){showToast(t('nothingSelected'));return}
+    const es=state.entries.filter(e=>state.selected.has(e.id)&&canExtractEntry(e));if(!es.length){showToast(t('nothingSelected'));return}
     try{showToast(t('saving'));if(es.length===1){await downloadEntry(es[0]);return}
       const blob=await buildStoredZip(es);const base=safeFilename(state.file.name.replace(/\.[^.]+$/,''),'archive');triggerDownload(blob,base+'-selected.zip');showToast(t('savedToast'))
     }catch(err){if(err?.code==='PASSWORD_CANCELLED'){showToast(t('passwordCancelled'));return}console.error(err);showToast(t('previewFailed'))}
@@ -788,7 +882,7 @@ var e=function(){"use strict";function r(e,r){postMessage({action:nr,cbn:r,resul
   function updateFilterBadge(){const n=[state.filterMin,state.filterMax,state.encryptedOnly,state.warningOnly].filter(Boolean).length;$('#filterCount').textContent=n?`(${n})`:'';$('#filterBtn').classList.toggle('active',n>0);$('#filterBtn').setAttribute('aria-expanded',String(!$('#filterPopover').classList.contains('hidden')))}
   function syncPaneState(){const ex=$('#explorer');ex.classList.toggle('folder-collapsed',state.leftCollapsed);ex.classList.toggle('inspector-collapsed',state.rightCollapsed);$('#showFolders').classList.toggle('hidden',!state.leftCollapsed);$('#showInspector').classList.toggle('hidden',!state.rightCollapsed)}
   function setupResizer(id,side){const el=$(id);let startX,startW;const move=e=>{const x=e.clientX??e.touches?.[0]?.clientX;if(x==null)return;const delta=x-startX;const min=150,max=420;const w=Math.max(min,Math.min(max,startW+(side==='left'?delta:-delta)));document.documentElement.style.setProperty(side==='left'?'--folder-width':'--inspector-width',w+'px')};const end=()=>{el.classList.remove('dragging');window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',end)};el.addEventListener('pointerdown',e=>{if(matchMedia('(max-width:980px)').matches)return;startX=e.clientX;startW=parseFloat(getComputedStyle(document.documentElement).getPropertyValue(side==='left'?'--folder-width':'--inspector-width'))|| (side==='left'?228:330);el.classList.add('dragging');el.setPointerCapture?.(e.pointerId);window.addEventListener('pointermove',move);window.addEventListener('pointerup',end)});el.addEventListener('keydown',e=>{if(!['ArrowLeft','ArrowRight'].includes(e.key))return;e.preventDefault();const prop=side==='left'?'--folder-width':'--inspector-width',cur=parseFloat(getComputedStyle(document.documentElement).getPropertyValue(prop))||(side==='left'?228:330),dir=e.key==='ArrowRight'?1:-1;document.documentElement.style.setProperty(prop,Math.max(150,Math.min(420,cur+dir*12))+'px')})}
-  function keyboardNavigate(e){if(!state.file||!$('#explorerView')||$('#explorerView').classList.contains('hidden'))return;if(e.target.matches('input,select,textarea,button')||document.querySelector('dialog[open]'))return;const items=filteredItems();if(!items.length)return;let i=Math.max(0,items.findIndex(x=>x.path===state.keyboardPath));if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();i=Math.max(0,Math.min(items.length-1,i+(e.key==='ArrowDown'?1:-1)));state.keyboardPath=items[i].path;renderFiles();ensureFileVisible(state.keyboardPath)}else if(e.key==='Enter'){e.preventDefault();const x=items[i];openPath(x.path,x.dir)}else if(e.key==='Backspace'&&state.cwd){e.preventDefault();state.cwd=dirname(state.cwd);state.active=null;renderTree();renderBreadcrumb();renderFiles();renderInspector()}else if(e.key===' '){e.preventDefault();const x=items[i];if(!x.dir){state.active=x.path;state.inspectorTab='preview';renderFiles();renderInspector()}}}
+  function keyboardNavigate(e){if(!state.file||!$('#explorerView')||$('#explorerView').classList.contains('hidden'))return;if(e.target.matches('input,select,textarea,button')||document.querySelector('dialog[open]'))return;const items=filteredItems();if(!items.length)return;let i=Math.max(0,items.findIndex(x=>(x.dir?x.path:x.id)===state.keyboardPath));if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();i=Math.max(0,Math.min(items.length-1,i+(e.key==='ArrowDown'?1:-1)));state.keyboardPath=items[i].dir?items[i].path:items[i].id;renderFiles();ensureFileVisible(state.keyboardPath)}else if(e.key==='Enter'){e.preventDefault();const x=items[i];openPath(x.dir?x.path:x.id,x.dir)}else if(e.key==='Backspace'&&state.cwd){e.preventDefault();state.cwd=dirname(state.cwd);state.active=null;renderTree();renderBreadcrumb();renderFiles();renderInspector()}else if(e.key===' '){e.preventDefault();const x=items[i];if(!x.dir){state.active=x.id;state.inspectorTab='preview';renderFiles();renderInspector()}}}
   function bind(){
     $('#pickBtn').onclick=()=>$('#fileInput').click();$('#replaceBtn').onclick=()=>$('#fileInput').click();
     $('#fileInput').onchange=e=>{const f=e.target.files?.[0];if(f)openArchive(f)};

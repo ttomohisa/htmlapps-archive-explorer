@@ -42,6 +42,18 @@ async function main() {
         await page.locator(HELP).waitFor();
         if (await page.locator('html').getAttribute('lang') !== language) await page.locator(LANGUAGE).click();
         assert.equal((await page.locator('[data-i18n="localOnly"]').textContent()).trim(), language === 'en' ? 'Fully local processing' : '完全ローカル処理', label + ': privacy wording');
+        assert.equal(await page.locator('.local-badge').isVisible(), width > PHONE_WIDTH, label + ': local badge is desktop-only');
+        const brandStyle = await page.locator('.brand-name').evaluate(el => {
+          const style = getComputedStyle(el);
+          return { font:style.fontFamily, size:style.fontSize, weight:style.fontWeight, width:el.getBoundingClientRect().width };
+        });
+        await page.locator(LANGUAGE).click();
+        const switchedBrandStyle = await page.locator('.brand-name').evaluate(el => {
+          const style = getComputedStyle(el);
+          return { font:style.fontFamily, size:style.fontSize, weight:style.fontWeight, width:el.getBoundingClientRect().width };
+        });
+        assert.deepEqual(switchedBrandStyle, brandStyle, label + ': stable title sizing when language changes');
+        await page.locator(LANGUAGE).click();
         assert.equal(await page.locator('body > footer').isVisible(), width > PHONE_WIDTH, label + ': informational footer breakpoint');
         await exerciseActions(page, width, label);
         assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), label + ': page width');
@@ -55,6 +67,7 @@ async function main() {
 
         await page.locator(HELP).click();
         const body = page.locator('#helpDialog .dialog-body');
+        assert.equal(await page.locator('#helpDialog .dialog-body > h3:first-child').evaluate(el => getComputedStyle(el).marginTop), '0px', label + ': no gap before first help heading');
         await body.evaluate(el => { el.scrollTop = el.scrollHeight; });
         const finalItem = page.locator('#helpDialog .dialog-body p:visible, #helpDialog .dialog-body li:visible').last();
         const finalBox = await finalItem.boundingBox(), bodyBox = await body.boundingBox();

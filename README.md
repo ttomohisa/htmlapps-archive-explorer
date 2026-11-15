@@ -8,6 +8,9 @@
 
 A privacy-focused, single-HTML archive inspector for exploring, previewing, analyzing, and extracting files from archives without uploading them to a server.
 
+
+Releases are created automatically when a new version in `app.config.json` is merged into `main`. Downloadable single-HTML builds are attached to each GitHub Release.
+
 ## 🚀 Live demo
 
 ### [Open Archive Explorer on GitHub Pages](https://ttomohisa.github.io/htmlapps-archive-explorer/)

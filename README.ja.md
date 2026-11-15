@@ -8,6 +8,9 @@
 
 ZIP・7z・RAR・TAR・GZIP・CAB・ISO・LZHなどの中身を、ファイルを外部へアップロードせずブラウザ内だけで確認・分析・取り出しできる単一HTMLアプリです。
 
+
+`app.config.json` のバージョンを更新して `main` にマージすると、タグと GitHub Release が自動作成されます。Release には単一HTML版を添付します。
+
 ## 🚀 デモ
 
 ### [GitHub PagesでArchive Explorerを開く](https://ttomohisa.github.io/htmlapps-archive-explorer/)

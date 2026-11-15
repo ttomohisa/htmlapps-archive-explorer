@@ -32,7 +32,7 @@ function testZip(records) {
   }
   const local=[],central=[];let offset=0;
   for(const record of records){
-    const name=Buffer.from(record.name,'utf8'),data=Buffer.from(record.data,'utf8'),crc=crc32(data);
+    const name=Buffer.from(record.name,'utf8'),data=Buffer.isBuffer(record.data)?record.data:Buffer.from(record.data,'utf8'),crc=crc32(data);
     const size=record.uncompressedSize??data.length,method=record.method??0,flags=0x800|(record.encrypted?1:0);
     const lh=Buffer.alloc(30),ch=Buffer.alloc(46);
     lh.writeUInt32LE(0x04034b50,0);lh.writeUInt16LE(20,4);lh.writeUInt16LE(flags,6);lh.writeUInt16LE(method,8);
@@ -74,6 +74,10 @@ async function exerciseFolderSelection(page,width,lang,label){
   await page.locator('#fileList [data-open="docs/sub"]').click();
   await page.locator('#fileList [data-select]').last().uncheck();
   assert.equal(await page.locator('#selectionText').textContent(),lang==='ja'?'1件選択':'1 selected',label+': individual exclusion from a selected folder');
+  await page.locator('#langBtn').click();
+  assert.equal(await page.locator('#selectionText').textContent(),lang==='ja'?'1 selected':'1件選択',label+': language switch preserves selection');
+  await page.locator('#langBtn').click();
+  assert.equal(await page.locator('#selectionText').textContent(),lang==='ja'?'1件選択':'1 selected',label+': selection survives second language switch');
   const pending=page.waitForEvent('download');
   await page.locator(width<=PHONE_WIDTH?'#mobileSave':'#extractSelected').click();
   const download=await pending;
@@ -133,6 +137,37 @@ async function exerciseReleaseEdgeCases(page,lang,label){
     document.documentElement.lang==='ja'?'Hexプレビューを省略':'Hex preview is skipped'),null,{timeout:10000});
   assert.ok((await page.locator('#previewBox').textContent()).includes(
     lang==='ja'?'Hexプレビューを省略':'Hex preview is skipped'),label+': avoid full decompression for huge binary preview');
+}
+
+
+async function exerciseNestedArchiveSelection(page,label){
+  const nested=testZip([{name:'inner.txt',data:'inside'}]);
+  const parent=testZip([{name:'notes/keep.txt',data:'keep'},{name:'nested.zip',data:nested}]);
+  await page.locator('#fileInput').setInputFiles({name:'parent.zip',mimeType:'application/zip',buffer:parent});
+  await page.locator('#fileList [data-select-folder="notes"]').check();
+  assert.equal(await page.locator('#selectionText').textContent(),'1件選択',label+': parent folder selected');
+  await page.locator('#fileList [data-open]').last().click();
+  await page.locator('#openNested').click();
+  await page.waitForFunction(()=>document.querySelector('#archiveName')?.textContent==='nested.zip'&&
+    document.querySelector('#fileList [data-select]')!=null,null,{timeout:10000});
+  await page.locator('#backArchiveBtn').click();
+  await page.waitForFunction(()=>document.querySelector('#archiveName')?.textContent==='parent.zip'&&
+    document.querySelector('#fileList [data-select-folder="notes"]')!=null,null,{timeout:10000});
+  assert.equal(await page.locator('#selectionText').textContent(),'1件選択',label+': folder selection restored after nested archive');
+  assert.equal(await page.locator('#fileList [data-select-folder="notes"]').isChecked(),true,label+': folder checkbox restored');
+}
+
+async function exerciseVirtualizedSelection(page,label){
+  const records=Array.from({length:310},(_,i)=>({name:'many/item-'+String(i).padStart(4,'0')+'.txt',data:'x'+i}));
+  const zip=testZip(records);
+  await page.locator('#fileInput').setInputFiles({name:'many.zip',mimeType:'application/zip',buffer:zip});
+  await page.locator('#fileList [data-select-folder="many"]').check();
+  await page.locator('#fileList [data-open="many"]').click();
+  assert.equal(await page.locator('#fileList').evaluate(el=>el.classList.contains('virtualized')),true,label+': large listing is virtualized');
+  assert.equal(await page.locator('#selectionText').textContent(),'310件選択',label+': all virtualized rows remain selected');
+  await page.locator('#fileList').evaluate(el=>{el.scrollTop=el.scrollHeight;el.dispatchEvent(new Event('scroll'))});
+  await page.waitForFunction(()=>document.querySelector('#fileList .virtual-items input[data-select]')!=null,null,{timeout:10000});
+  assert.equal(await page.locator('#selectionText').textContent(),'310件選択',label+': selection survives virtual scroll');
 }
 
 async function main() {
@@ -207,6 +242,10 @@ async function main() {
         assert.equal(await page.locator('#helpDialog').isVisible(), false, label + ': Help reopens and closes');
         if (file === 'dist/index.html' && ((language === 'ja' && width === 1360) || (language === 'en' && width === 393))) {
           await exerciseReleaseEdgeCases(page,language,label);
+        }
+        if (file === 'dist/index.html' && language === 'ja' && width === 1360) {
+          await exerciseNestedArchiveSelection(page,label);
+          await exerciseVirtualizedSelection(page,label);
         }
         assert.deepEqual(errors, [], label + ': console errors');
         assert.deepEqual(requests, [], label + ': no external runtime requests');

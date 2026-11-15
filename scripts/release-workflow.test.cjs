@@ -22,6 +22,7 @@ test('header hero and responsive affordances use the expected visible copy and s
   assert.match(html,/<h2 data-i18n="heroTitle">圧縮ファイルの中身を確認<\/h2>/);
   assert.match(html,/heroTitle:"See what's inside an archive"/);
   assert.match(html,/\.brand-name\{[^}]*font:700 17px\/1\.2 Arial,Helvetica,sans-serif/);
+  assert.match(html,/\.language-button\{font-size:12px;min-width:28px;text-align:center\}/);
   assert.match(html,/@media\(max-width:720px\)[\s\S]*?\.local-badge\{display:none\}/);
   assert.match(html,/#helpDialog > \.dialog-body > h3:first-child\{margin-top:0\}/);
   assert.match(html,/<path d="M4\.5 14\.5v4a2 2/);

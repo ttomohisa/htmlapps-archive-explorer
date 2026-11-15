@@ -24,7 +24,7 @@ GitHub Pages delivers only the initial HTML. After it loads, archive parsing, pr
 - **Explore archives before extracting** — Browse folders, filenames, sizes, packed sizes, ratios, timestamps, and CRC32 metadata in an Explorer-style UI.
 - **Inspect many archive formats locally** — ZIP, 7z, RAR5, TAR, GZIP, CAB, ISO, and LZH/LHA are parsed in the browser with no runtime CDN.
 - **See what is actually extractable** — The archive header shows whether all, some, or none of the entries can be extracted, including password-required and unsupported-method counts.
-- **Preview without unpacking everything** — View images, text, code, and unknown binaries. Binary files get a 4 KiB Hex + ASCII preview with common magic-signature detection.
+- **Preview without unpacking everything** — View images, text, code, and unknown binaries. Binary files can get a 4 KiB Hex + ASCII preview with common magic-signature detection; very large compressed files are skipped when a full decompression would be required.
 - **Understand archive structure visually** — Archive Map, type distribution, largest folders/items, and compression statistics help reveal where space is used.
 - **Find notable entries quickly** — Detect suspicious paths, absolute paths, executables/scripts, double extensions, extreme compression ratios, encrypted entries, and nested archives.
 - **Open nested archives in place** — Enter supported archives stored inside another archive and return to the parent without manually saving them first.

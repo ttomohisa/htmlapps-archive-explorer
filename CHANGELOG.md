@@ -3,6 +3,9 @@
 ## 1.1.0 - 2026-11-15
 
 - Select folders recursively from the file list or desktop folder tree; show partial and unavailable states, deduplicate overlapping choices, and save folder-origin selections as ZIP even for a single remaining file.
+- Cancel outdated archive parsing, extraction, ZIP exports and password prompts when a newer archive is opened; keep the newer archive visible and allow reselecting the same file.
+- Prevent exported ZIPs from including file/directory prefix collisions and avoid inflating huge compressed binary/solid 7z streams solely for Hex previews.
+- Restore appropriate mobile list/inspector state after opening a different or nested archive; enlarge phone selection tap targets.
 
 - Verify ZIP entry CRC32 and uncompressed length before extraction, and reject truncated ZIP data or false end-of-directory signatures in comments.
 - Interpret PAX and GNU TAR long-name metadata without showing metadata headers as files; treat TAR link entries as non-extractable.

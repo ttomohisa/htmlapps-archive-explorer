@@ -47,7 +47,7 @@ Known unsupported / partial:
 - `previewing`: selected entry is being decompressed for preview.
 - `error`: source is invalid or unsupported.
 
-Changing the source increments a generation token and invalidates stale async work. Opening a different top-level archive clears any cached archive password. Nested archives have separate in-memory password state; returning to a parent restores only that parent's in-memory state.
+Changing the source increments a generation token and invalidates stale async work. Stale parsing, extraction, bulk ZIP exports, and password prompts must not overwrite or reset a newer archive. Opening a different top-level archive cancels password dialogs and clears cached passwords; selecting the same file again is supported. Nested archives have separate in-memory password state; returning to a parent restores only that parent's in-memory state.
 
 ## Explorer
 

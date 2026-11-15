@@ -818,17 +818,39 @@ var e=function(){"use strict";function r(e,r){postMessage({action:nr,cbn:r,resul
   async function downloadEntry(e){if(!canExtractEntry(e)){showToast(extractionBlockReason(e)||t('cannotExtract'));return}try{showToast(t('saving'));const d=await entryData(e);triggerDownload(new Blob([d]),e.name);showToast(t('savedToast'))}catch(err){if(err?.code==='PASSWORD_CANCELLED'){showToast(t('passwordCancelled'));return}console.error(err);showToast(t('previewFailed'))}}
   function u16(n){return[n&255,(n>>8)&255]} function u32(n){return[n&255,(n>>8)&255,(n>>16)&255,(n>>24)&255]}
   function dosNow(d){d=d||new Date();const date=((Math.max(1980,d.getFullYear())-1980)<<9)|((d.getMonth()+1)<<5)|d.getDate();const time=(d.getHours()<<11)|(d.getMinutes()<<5)|(d.getSeconds()>>1);return{date,time}}
+  function safeZipEntryPath(path){
+    const parts=cleanPath(String(path||'').replace(/^[A-Za-z]:/,'')).split('/')
+      .filter(part=>part&&part!=='.'&&part!=='..')
+      .map(part=>part.replace(/[\x00-\x1f:*?"<>|]/g,'_').replace(/[. ]+$/g,'')||'_');
+    return parts.join('/')||'file';
+  }
   async function buildStoredZip(entries){
-    const files=[];for(const e of entries){const data=await entryData(e);files.push({e,data,crc:crc32(data),name:new TextEncoder().encode(cleanPath(e.path))})}
+    if(entries.length>65535)throw new Error('Too many selected files for ZIP32');
+    const files=[],used=new Set(),encoder=new TextEncoder();
+    for(const e of entries){
+      const data=await entryData(e);
+      let path=safeZipEntryPath(e.path);
+      const key=name=>name.toLowerCase();
+      if(used.has(key(path))){
+        const slash=path.lastIndexOf('/'),dir=path.slice(0,slash+1),base=path.slice(slash+1),dot=base.lastIndexOf('.'),stem=dot>0?base.slice(0,dot):base,ext=dot>0?base.slice(dot):'';
+        for(let n=2;;n++){const candidate=dir+stem+'-'+n+ext;if(!used.has(key(candidate))){path=candidate;break}}
+      }
+      used.add(key(path));
+      const name=encoder.encode(path);
+      if(data.length>0xffffffff||name.length>65535)throw new Error('ZIP32 export limit exceeded');
+      files.push({e,data,crc:crc32(data),name});
+    }
     let offset=0,locals=[],centrals=[];
     for(const f of files){
       const dt=dosNow(f.e.modified),nl=f.name.length;
       const lh=new Uint8Array([80,75,3,4,20,0,0,8,0,0,...u16(dt.time),...u16(dt.date),...u32(f.crc),...u32(f.data.length),...u32(f.data.length),...u16(nl),0,0,...f.name]);
       locals.push(lh,f.data);
       const ch=new Uint8Array([80,75,1,2,20,0,20,0,0,8,0,0,...u16(dt.time),...u16(dt.date),...u32(f.crc),...u32(f.data.length),...u32(f.data.length),...u16(nl),0,0,0,0,0,0,0,0,0,0,0,0,...u32(offset),...f.name]);
-      centrals.push(ch);offset+=lh.length+f.data.length
+      centrals.push(ch);offset+=lh.length+f.data.length;
+      if(offset>0xffffffff)throw new Error('ZIP32 export limit exceeded')
     }
     const cdSize=centrals.reduce((a,x)=>a+x.length,0),count=files.length;
+    if(cdSize>0xffffffff||offset+cdSize>0xffffffff)throw new Error('ZIP32 export limit exceeded');
     const end=new Uint8Array([80,75,5,6,0,0,0,0,...u16(count),...u16(count),...u32(cdSize),...u32(offset),0,0]);
     return new Blob([...locals,...centrals,end],{type:'application/zip'})
   }

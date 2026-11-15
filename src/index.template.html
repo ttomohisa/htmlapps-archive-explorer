@@ -779,7 +779,7 @@ var e=function(){"use strict";function r(e,r){postMessage({action:nr,cbn:r,resul
     $('#folderTree').innerHTML=rows.join('');
     $$('#folderTree [data-toggle-folder]').forEach(b=>b.onclick=e=>{e.stopPropagation();const f=b.dataset.toggleFolder;if(state.expandedFolders.has(f))state.expandedFolders.delete(f);else state.expandedFolders.add(f);renderTree()});
     $('#folderTree').onchange=e=>{const input=e.target.closest('[data-select-folder]');if(input&&!input.disabled)toggleFolderSelection(input.dataset.selectFolder,input.checked)};
-    $('#folderTree [data-folder]').forEach(b=>b.onclick=()=>{const f=b.dataset.folder;state.cwd=f;state.active=null;let cur=f;while(cur){state.expandedFolders.add(dirname(cur));cur=dirname(cur)};$('#explorer').classList.remove('show-inspector');renderTree();renderBreadcrumb();renderFiles();renderInspector()})
+    $$('#folderTree [data-folder]').forEach(b=>b.onclick=()=>{const f=b.dataset.folder;state.cwd=f;state.active=null;let cur=f;while(cur){state.expandedFolders.add(dirname(cur));cur=dirname(cur)};$('#explorer').classList.remove('show-inspector');renderTree();renderBreadcrumb();renderFiles();renderInspector()})
     syncSelectionControls();
   }
   function renderBreadcrumb(){

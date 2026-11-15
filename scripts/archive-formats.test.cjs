@@ -108,6 +108,27 @@ test('ZIP re-export removes traversal and absolute paths and deduplicates names'
   assert.deepEqual(entries.map(e=>e.path),['same.txt','same-2.txt','same-3.txt']);
   for(const e of entries)assert.equal(new TextDecoder().decode(await e.getData()),'ok');
 });
+
+test('ZIP export disambiguates both file/directory prefix collisions and case collisions',async()=>{
+  const paths=[
+    'notes', 'notes/a.txt', 'docs/file.txt', 'DOCS',
+    'docs/FILE.txt', 'notes/b.txt'
+  ];
+  const files=paths.map((name,i)=>({
+    path:name,
+    modified:new Date('2026-01-01'),
+    getData:async()=>enc.encode('record-'+i)
+  }));
+  const blob=await api.buildStoredZip(files);
+  const entries=await api.parseZip(fileFrom(new Uint8Array(await blob.arrayBuffer())),1);
+  assert.deepEqual(entries.map(e=>e.path),[
+    'notes', 'notes-2/a.txt', 'docs/file.txt', 'DOCS-2',
+    'docs/FILE-2.txt', 'notes-2/b.txt'
+  ]);
+  assert.deepEqual(await Promise.all(entries.map(async e=>new TextDecoder().decode(await e.getData()))),
+    files.map((_,i)=>'record-'+i));
+});
+
 test('TAR.GZ per-entry compression is marked unavailable, not zero savings',()=>{
   assert.match(source,/for\(const entry of entries\)if\(!entry\.dir\)entry\.compressedSize=null/);
 });

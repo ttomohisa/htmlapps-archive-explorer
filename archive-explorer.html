@@ -701,8 +701,8 @@ var e=function(){"use strict";function r(e,r){postMessage({action:nr,cbn:r,resul
     return '<label class="folder-select" title="'+esc(title)+'"><input type="checkbox" data-select-folder="'+esc(folder)+'" aria-label="'+esc(t('selectFolder',label))+'" title="'+esc(title)+'"'+(eligible===0?' disabled':'')+(eligible&&selected===eligible?' checked':'')+(selected&&selected<eligible?' aria-checked="mixed"':'')+'></label>';
   }
   function syncSelectionControls(){
-    $('[data-select]').forEach(input=>{input.checked=state.selected.has(input.dataset.select)});
-    $('[data-select-folder]').forEach(input=>{
+    $$('[data-select]').forEach(input=>{input.checked=state.selected.has(input.dataset.select)});
+    $$('[data-select-folder]').forEach(input=>{
       const {eligible,selected,total}=folderSelectionState(input.dataset.selectFolder);
       input.disabled=eligible===0;
       input.checked=eligible>0&&selected===eligible;

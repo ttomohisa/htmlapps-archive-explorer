@@ -424,7 +424,7 @@ var e=function(){"use strict";function r(e,r){postMessage({action:nr,cbn:r,resul
       if(i+22+readU16(view,i+20)!==view.byteLength)continue;
       const count=readU16(view,i+10),size=readU32(view,i+12),offset=readU32(view,i+16);
       if(count!==0xffff&&size!==0xffffffff&&offset!==0xffffffff){
-        if(offset+size>i||count&&(offset+4>view.byteLength||readU32(view,offset)!==0x02014b50))continue;
+        if(offset+size!==i||count&&(offset+4>view.byteLength||readU32(view,offset)!==0x02014b50))continue;
       }
       return i;
     }

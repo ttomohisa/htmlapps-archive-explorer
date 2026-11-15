@@ -13,7 +13,7 @@ Primary promise:
 - ZIP: Stored (method 0), Deflate (method 8), including traditional ZipCrypto encryption
 - 7z: single-folder / solid LZMA streams
 - RAR5: Stored entries
-- TAR
+- TAR: POSIX, PAX path/size/time metadata, and GNU long-name extensions
 - GZIP
 - TAR.GZ / TGZ
 - CAB: uncompressed folders
@@ -28,6 +28,7 @@ Known unsupported / partial:
 - 7z LZMA2, BCJ chains, multiple folders/coders: unsupported
 - RAR4 and compressed RAR5: unsupported
 - CAB MSZIP/LZX and compressed LZH methods: unsupported
+- TAR symlink/hardlink entries: visible, but not extractable
 
 ## Trust boundary
 
@@ -46,7 +47,7 @@ Known unsupported / partial:
 - `previewing`: selected entry is being decompressed for preview.
 - `error`: source is invalid or unsupported.
 
-Changing the source increments a generation token and invalidates stale async work. Opening a different top-level archive clears any cached archive password. Nested archives have separate in-memory password state; returning to a parent restores only that parent's in-memory state.
+Changing the source increments a generation token and invalidates stale async work. Stale parsing, extraction, bulk ZIP exports, and password prompts must not overwrite or reset a newer archive. Opening a different top-level archive cancels password dialogs and clears cached passwords; selecting the same file again is supported. Nested archives have separate in-memory password state; returning to a parent restores only that parent's in-memory state.
 
 ## Explorer
 
@@ -137,7 +138,7 @@ Limits:
 ## Export
 
 - one selected file: download original content
-- multiple selected files: create a Store-only ZIP with UTF-8 paths
+- multiple selected files: create a Store-only ZIP with UTF-8 paths, sanitize traversal/absolute paths and resolve filename collisions
 - manifest: JSON / CSV / TXT
 - output filename is user-editable for manifest export
 
@@ -157,5 +158,5 @@ Limits:
 ## Interaction links
 
 - Notes and duplicate candidates link back to the exact file in Explorer and clear conflicting filters so the target remains visible.
-- Selecting files reveals a contextual extraction bar.
+- Selecting files or folders reveals a contextual extraction bar. A folder checkbox selects all recursively nested extractable file entries by unique entry ID, not pathname, and skips unsupported entries. Root-folder selection covers the archive; file-list folder checkboxes are available on mobile and tree checkboxes on desktop. The checkbox is mixed when some extractable descendants are selected and disabled when none can be extracted. Overlapping selections do not duplicate files; unchecking a folder deselects its extractable descendants. Folder-origin selections are exported as ZIP even if only one extractable file remains, preserving original relative archive paths. Empty directories are not exported.
 - File list headers sort name, size and compression ratio.

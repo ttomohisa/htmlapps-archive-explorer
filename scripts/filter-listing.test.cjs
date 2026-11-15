@@ -51,6 +51,11 @@ function harness(overrides = {}) {
     virtualItems: [], virtualized: false, virtualStart: -1, listContextKey: '',
     ...overrides,
   };
+  // Warnings refer to the actual indexed entry objects, not matching path strings.
+  // A ZIP can contain separate entries with identical paths.
+  state.warnings = state.warnings.map(w => ({
+    ...w, arr: w.arr.map(item => state.entries.find(entry => entry.path === item.path) || item),
+  }));
   const nodes = Object.fromEntries([
     'fileList', 'searchInput', 'typeFilter', 'minSize', 'maxSize',
     'encryptedOnly', 'warningOnly', 'filterCount', 'filterBtn',
@@ -65,6 +70,7 @@ function harness(overrides = {}) {
   const extOf = name => name.split('.').at(-1).toLowerCase();
   const context = vm.createContext({
     state, VIRTUAL_THRESHOLD: 250,
+    syncSelectionControls: () => {},
     $: selector => {
       assert.ok(nodes[selector.slice(1)], `Unexpected DOM access: ${selector}`);
       return nodes[selector.slice(1)];

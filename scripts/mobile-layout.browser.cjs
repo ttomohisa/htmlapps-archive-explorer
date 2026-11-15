@@ -12,10 +12,170 @@ const artifacts = path.resolve('test-results/mobile-layout');
 async function exerciseActions(page, width, label) {
   await page.locator('#fileInput').setInputFiles({name:'mobile-layout.zip', mimeType:'application/zip', buffer:Buffer.from('UEsDBBQAAAAAAMyOV123NFxhJwAAACcAAAAKAAAAc2FtcGxlLnR4dFN5bnRoZXRpYyBsb2NhbCBtb2JpbGUtbGF5b3V0IGZpeHR1cmUuClBLAQIUAxQAAAAAAMyOV123NFxhJwAAACcAAAAKAAAAAAAAAAAAAACAAQAAAABzYW1wbGUudHh0UEsFBgAAAAABAAEAOAAAAE8AAAAAAA==', 'base64')});
   await page.locator('#appView').waitFor();
+  assert.equal(await page.locator('#fileInput').inputValue(), '', label + ': same file can be reselected');
   if (width <= PHONE_WIDTH) {
     assert.equal(await page.locator('#mobileBar').isVisible(), true, label + ': mobile navigation');
     for (const control of ['[data-mobile-view="explorerView"]','[data-mobile-view="analysisView"]','[data-mobile-view="safetyView"]','#mobileSave']) assert.equal(await page.locator(control).isVisible(), true, label + ': navigation action ' + control);
   }
+}
+
+
+function testZip(records) {
+  let crcTable = null;
+  function crc32(bytes) {
+    if (!crcTable) crcTable = Array.from({length:256},(_,i)=>{
+      let c=i; for(let n=0;n<8;n++)c=(c>>>1)^((c&1)?0xedb88320:0);return c>>>0;
+    });
+    let crc=0xffffffff;
+    for(const byte of bytes)crc=(crc>>>8)^crcTable[(crc^byte)&255];
+    return (crc^0xffffffff)>>>0;
+  }
+  const local=[],central=[];let offset=0;
+  for(const record of records){
+    const name=Buffer.from(record.name,'utf8'),data=Buffer.isBuffer(record.data)?record.data:Buffer.from(record.data,'utf8'),crc=crc32(data);
+    const size=record.uncompressedSize??data.length,method=record.method??0,flags=0x800|(record.encrypted?1:0);
+    const lh=Buffer.alloc(30),ch=Buffer.alloc(46);
+    lh.writeUInt32LE(0x04034b50,0);lh.writeUInt16LE(20,4);lh.writeUInt16LE(flags,6);lh.writeUInt16LE(method,8);
+    lh.writeUInt32LE(crc,14);lh.writeUInt32LE(data.length,18);lh.writeUInt32LE(size,22);lh.writeUInt16LE(name.length,26);
+    ch.writeUInt32LE(0x02014b50,0);ch.writeUInt16LE(20,4);ch.writeUInt16LE(20,6);ch.writeUInt16LE(flags,8);ch.writeUInt16LE(method,10);
+    ch.writeUInt32LE(crc,16);ch.writeUInt32LE(data.length,20);ch.writeUInt32LE(size,24);ch.writeUInt16LE(name.length,28);ch.writeUInt32LE(offset,42);
+    local.push(lh,name,data);central.push(ch,name);offset+=lh.length+name.length+data.length;
+  }
+  const centralSize=central.reduce((n,part)=>n+part.length,0),eocd=Buffer.alloc(22);
+  eocd.writeUInt32LE(0x06054b50,0);eocd.writeUInt16LE(records.length,8);eocd.writeUInt16LE(records.length,10);
+  eocd.writeUInt32LE(centralSize,12);eocd.writeUInt32LE(offset,16);
+  return Buffer.concat([...local,...central,eocd]);
+}
+
+async function exerciseFolderSelection(page,width,lang,label){
+  const fixture=testZip([
+    {name:'docs/a.txt',data:'A'},
+    {name:'docs/sub/b.txt',data:'B'},
+    {name:'docs/sub/c.txt',data:'C'},
+    {name:'docs-more/outside.txt',data:'OUTSIDE'},
+  ]);
+  await page.locator('#fileInput').setInputFiles({name:'folders.zip',mimeType:'application/zip',buffer:fixture});
+  const folder=page.locator('#fileList [data-select-folder="docs"]');
+  await folder.waitFor();
+  if(width<=PHONE_WIDTH){
+    const rect=await folder.evaluate(el=>el.parentElement.getBoundingClientRect().toJSON());
+    assert.ok(rect.width>=44&&rect.height>=44,label+': phone folder tap target at least 44px');
+  }
+  await folder.check();
+  assert.equal(await page.locator('#selectionText').textContent(),lang==='ja'?'3件選択':'3 selected',label+': folder selection count');
+  await page.locator('#fileList [data-open="docs"]').click();
+  const a=page.locator('#fileList [data-select]').first();
+  if(width<=PHONE_WIDTH){
+    const rect=await a.evaluate(el=>el.parentElement.getBoundingClientRect().toJSON());
+    assert.ok(rect.width>=44&&rect.height>=44,label+': phone file tap target at least 44px');
+  }
+  await a.uncheck();
+  await page.locator('#breadcrumb [data-crumb=""]').click();
+  assert.equal(await folder.evaluate(el=>el.indeterminate),true,label+': partial folder selection');
+  await folder.check();
+  assert.equal(await page.locator('#selectionText').textContent(),lang==='ja'?'3件選択':'3 selected',label+': no duplicates from reselection');
+  await folder.uncheck();
+  assert.equal(await page.locator('#selectionBar').isVisible(),false,label+': clear folder selection');
+  await page.locator('#fileList [data-open="docs"]').click();
+  await page.locator('#fileList [data-select-folder="docs/sub"]').check();
+  assert.equal(await page.locator('#selectionText').textContent(),lang==='ja'?'2件選択':'2 selected',label+': nested folder selection');
+  await page.locator('#fileList [data-open="docs/sub"]').click();
+  await page.locator('#fileList [data-select]').last().uncheck();
+  assert.equal(await page.locator('#selectionText').textContent(),lang==='ja'?'1件選択':'1 selected',label+': individual exclusion from a selected folder');
+  await page.locator('#langBtn').click();
+  assert.equal(await page.locator('#selectionText').textContent(),lang==='ja'?'1 selected':'1件選択',label+': language switch preserves selection');
+  await page.locator('#langBtn').click();
+  assert.equal(await page.locator('#selectionText').textContent(),lang==='ja'?'1件選択':'1 selected',label+': selection survives second language switch');
+  const pending=page.waitForEvent('download');
+  await page.locator(width<=PHONE_WIDTH?'#mobileSave':'#extractSelected').click();
+  const download=await pending;
+  assert.match(download.suggestedFilename(),/-selected\.zip$/,label+': folder exports as ZIP');
+  const bytes=await fs.promises.readFile(await download.path());
+  assert.equal(bytes.readUInt32LE(0),0x04034b50,label+': valid ZIP header');
+  const filename=bytes.subarray(30,30+bytes.readUInt16LE(26)).toString('utf8');
+  assert.equal(filename,'docs/sub/b.txt',label+': folder path preserved');
+  assert.equal(bytes.includes(Buffer.from('docs-more/outside.txt')),false,label+': sibling excluded');
+}
+
+
+async function exerciseReleaseEdgeCases(page,lang,label){
+  const valid=testZip([{name:'fresh.txt',data:'fresh'}]);
+  const stale=testZip([{name:'old.txt',data:'old'}]);
+  await page.evaluate(({oldBytes,newBytes})=>{
+    const input=document.querySelector('#fileInput');
+    const original=File.prototype.arrayBuffer;
+    File.prototype.arrayBuffer=function(...args){
+      if(this.name==='old-slow.zip')return new Promise((resolve,reject)=>{
+        setTimeout(()=>original.apply(this,args).then(resolve,reject),170);
+      });
+      return original.apply(this,args);
+    };
+    const emit=(name,values)=>{
+      const list=new DataTransfer();
+      list.items.add(new File([new Uint8Array(values)],name,{type:'application/zip'}));
+      input.files=list.files;
+      input.dispatchEvent(new Event('change',{bubbles:true}));
+    };
+    emit('old-slow.zip',oldBytes);
+    setTimeout(()=>emit('fresh.zip',newBytes),30);
+    setTimeout(()=>{File.prototype.arrayBuffer=original},400);
+  },{oldBytes:[...stale],newBytes:[...valid]});
+  await page.waitForFunction(()=>document.querySelector('#archiveName')?.textContent==='fresh.zip'&&
+    document.querySelector('#fileList [data-select]')!=null,null,{timeout:10000});
+  await page.waitForTimeout(260);
+  assert.equal(await page.locator('#appView').isVisible(),true,label+': earlier archive must not clear replacement');
+  assert.equal(await page.locator('#archiveName').textContent(),'fresh.zip',label+': newest archive survives delayed ZIP');
+  assert.equal(await page.locator('#fileList .file-name').first().textContent(),'fresh.txt',label+': newest entry is visible');
+  assert.equal(await page.locator('#fileInput').inputValue(),'',label+': reselecting the same file is possible');
+
+  const encrypted=testZip([{name:'secrets.txt',data:'not-encrypted-on-purpose',encrypted:true}]);
+  await page.locator('#fileInput').setInputFiles({name:'password.zip',mimeType:'application/zip',buffer:encrypted});
+  await page.locator('#fileList [data-open]').first().click();
+  await page.locator('#passwordDialog').waitFor();
+  await page.locator('#fileInput').setInputFiles({name:'fresh.zip',mimeType:'application/zip',buffer:valid});
+  await page.waitForFunction(()=>document.querySelector('#archiveName')?.textContent==='fresh.zip'&&
+    document.querySelector('#fileList [data-select]')!=null,null,{timeout:10000});
+  assert.equal(await page.locator('#passwordDialog').isVisible(),false,label+': old password dialog is cancelled');
+  assert.equal(await page.locator('#archivePassword').inputValue(),'',label+': previous password input was cleared');
+
+  const huge=testZip([{name:'too-big.bin',data:'',method:8,uncompressedSize:80*1024*1024}]);
+  await page.locator('#fileInput').setInputFiles({name:'large-deflate.zip',mimeType:'application/zip',buffer:huge});
+  await page.locator('#fileList [data-open]').first().click();
+  await page.waitForFunction(()=>document.querySelector('#previewBox')?.textContent?.includes(
+    document.documentElement.lang==='ja'?'Hexプレビューを省略':'Hex preview is skipped'),null,{timeout:10000});
+  assert.ok((await page.locator('#previewBox').textContent()).includes(
+    lang==='ja'?'Hexプレビューを省略':'Hex preview is skipped'),label+': avoid full decompression for huge binary preview');
+}
+
+
+async function exerciseNestedArchiveSelection(page,label){
+  const nested=testZip([{name:'inner.txt',data:'inside'}]);
+  const parent=testZip([{name:'notes/keep.txt',data:'keep'},{name:'nested.zip',data:nested}]);
+  await page.locator('#fileInput').setInputFiles({name:'parent.zip',mimeType:'application/zip',buffer:parent});
+  await page.locator('#fileList [data-select-folder="notes"]').check();
+  assert.equal(await page.locator('#selectionText').textContent(),'1件選択',label+': parent folder selected');
+  await page.locator('#fileList [data-open]').last().click();
+  await page.locator('#openNested').click();
+  await page.waitForFunction(()=>document.querySelector('#archiveName')?.textContent==='nested.zip'&&
+    document.querySelector('#fileList [data-select]')!=null,null,{timeout:10000});
+  await page.locator('#backArchiveBtn').click();
+  await page.waitForFunction(()=>document.querySelector('#archiveName')?.textContent==='parent.zip'&&
+    document.querySelector('#fileList [data-select-folder="notes"]')!=null,null,{timeout:10000});
+  assert.equal(await page.locator('#selectionText').textContent(),'1件選択',label+': folder selection restored after nested archive');
+  assert.equal(await page.locator('#fileList [data-select-folder="notes"]').isChecked(),true,label+': folder checkbox restored');
+}
+
+async function exerciseVirtualizedSelection(page,label){
+  const records=Array.from({length:310},(_,i)=>({name:'many/item-'+String(i).padStart(4,'0')+'.txt',data:'x'+i}));
+  const zip=testZip(records);
+  await page.locator('#fileInput').setInputFiles({name:'many.zip',mimeType:'application/zip',buffer:zip});
+  await page.locator('#fileList [data-select-folder="many"]').check();
+  await page.locator('#fileList [data-open="many"]').click();
+  assert.equal(await page.locator('#fileList').evaluate(el=>el.classList.contains('virtualized')),true,label+': large listing is virtualized');
+  assert.equal(await page.locator('#selectionText').textContent(),'310件選択',label+': all virtualized rows remain selected');
+  await page.locator('#fileList').evaluate(el=>{el.scrollTop=el.scrollHeight;el.dispatchEvent(new Event('scroll'))});
+  await page.waitForFunction(()=>document.querySelector('#fileList .virtual-items input[data-select]')!=null,null,{timeout:10000});
+  assert.equal(await page.locator('#selectionText').textContent(),'310件選択',label+': selection survives virtual scroll');
 }
 
 async function main() {
@@ -42,8 +202,23 @@ async function main() {
         await page.locator(HELP).waitFor();
         if (await page.locator('html').getAttribute('lang') !== language) await page.locator(LANGUAGE).click();
         assert.equal((await page.locator('[data-i18n="localOnly"]').textContent()).trim(), language === 'en' ? 'Fully local processing' : '完全ローカル処理', label + ': privacy wording');
+        assert.equal(await page.locator('.local-badge').isVisible(), width > PHONE_WIDTH, label + ': local badge is desktop-only');
+        const brandStyle = await page.locator('.brand-name').evaluate(el => {
+          const style = getComputedStyle(el);
+          return { font:style.fontFamily, size:style.fontSize, weight:style.fontWeight, width:el.getBoundingClientRect().width };
+        });
+        await page.locator(LANGUAGE).click();
+        const switchedBrandStyle = await page.locator('.brand-name').evaluate(el => {
+          const style = getComputedStyle(el);
+          return { font:style.fontFamily, size:style.fontSize, weight:style.fontWeight, width:el.getBoundingClientRect().width };
+        });
+        assert.deepEqual(switchedBrandStyle, brandStyle, label + ': stable title sizing when language changes');
+        await page.locator(LANGUAGE).click();
         assert.equal(await page.locator('body > footer').isVisible(), width > PHONE_WIDTH, label + ': informational footer breakpoint');
         await exerciseActions(page, width, label);
+        if (file === 'dist/index.html' && ((language === 'ja' && width === 1360) || (language === 'en' && width === 393))) {
+          await exerciseFolderSelection(page,width,language,label);
+        }
         assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), label + ': page width');
         // Responsive changes must not leave the informational footer in a stale state.
         await page.setViewportSize({width:PHONE_WIDTH + 1, height});
@@ -55,6 +230,7 @@ async function main() {
 
         await page.locator(HELP).click();
         const body = page.locator('#helpDialog .dialog-body');
+        assert.equal(await page.locator('#helpDialog .dialog-body > h3:first-child').evaluate(el => getComputedStyle(el).marginTop), '0px', label + ': no gap before first help heading');
         await body.evaluate(el => { el.scrollTop = el.scrollHeight; });
         const finalItem = page.locator('#helpDialog .dialog-body p:visible, #helpDialog .dialog-body li:visible').last();
         const finalBox = await finalItem.boundingBox(), bodyBox = await body.boundingBox();
@@ -72,6 +248,13 @@ async function main() {
         await page.locator(HELP).click();
         await page.locator('#helpDialog').locator(CLOSE).first().click();
         assert.equal(await page.locator('#helpDialog').isVisible(), false, label + ': Help reopens and closes');
+        if (file === 'dist/index.html' && ((language === 'ja' && width === 1360) || (language === 'en' && width === 393))) {
+          await exerciseReleaseEdgeCases(page,language,label);
+        }
+        if (file === 'dist/index.html' && language === 'ja' && width === 1360) {
+          await exerciseNestedArchiveSelection(page,label);
+          await exerciseVirtualizedSelection(page,label);
+        }
         assert.deepEqual(errors, [], label + ': console errors');
         assert.deepEqual(requests, [], label + ': no external runtime requests');
         console.log('PASS ' + label);

@@ -29,7 +29,7 @@ GitHub Pages delivers only the initial HTML. After it loads, archive parsing, pr
 - **Find notable entries quickly** — Detect suspicious paths, absolute paths, executables/scripts, double extensions, extreme compression ratios, encrypted entries, and nested archives.
 - **Open nested archives in place** — Enter supported archives stored inside another archive and return to the parent without manually saving them first.
 - **Stay responsive on large archives** — Large file lists are virtualized while search, sort, filters, selection, and keyboard navigation still operate over the full result set.
-- **Extract only what you need** — Save one entry directly or package multiple selected entries into a new ZIP. Paths are normalized and duplicate names are disambiguated in the new ZIP.
+- **Extract only what you need** — Save one entry directly or package multiple selected entries into a new ZIP. Select folders to include all extractable files beneath them; paths are normalized and duplicate names are disambiguated.
 - **Ask for passwords only when needed** — Traditional ZipCrypto ZIP passwords are requested only when encrypted bytes are needed, kept only in memory for the active archive, and never saved.
 
 ## Quick start
@@ -63,7 +63,7 @@ Python, Node.js, and a local web server are not required. The builder uses Windo
 4. Use Inspector to switch between **Preview**, **Details**, and **Notes**. Unknown binary files automatically use Hex preview.
 5. Search by filename/path, or use shortcuts such as `*.png`, `ext:js`, `>10MB`, and `<500KB`.
 6. Open **Analysis** to inspect Archive Map, type distribution, and size/compression summaries.
-7. Select one or more extractable files and save them. Multiple selections are packaged into a new ZIP.
+7. Check files or folders, then save. A folder checkbox selects extractable files in nested folders too; unsupported entries and empty directories are skipped. Folder-origin selections are packaged into a ZIP, even if only one file remains.
 
 ### Dialogs on small screens
 

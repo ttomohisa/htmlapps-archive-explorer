@@ -2,6 +2,8 @@
 
 ## 1.0.4 - 2026-11-15
 
+- Select folders recursively from the file list or desktop folder tree; show partial and unavailable states, deduplicate overlapping choices, and save folder-origin selections as ZIP even for a single remaining file.
+
 - Verify ZIP entry CRC32 and uncompressed length before extraction, and reject truncated ZIP data or false end-of-directory signatures in comments.
 - Interpret PAX and GNU TAR long-name metadata without showing metadata headers as files; treat TAR link entries as non-extractable.
 - Distinguish entries with identical paths during selection, preview, keyboard navigation and extraction.

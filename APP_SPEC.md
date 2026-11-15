@@ -158,5 +158,5 @@ Limits:
 ## Interaction links
 
 - Notes and duplicate candidates link back to the exact file in Explorer and clear conflicting filters so the target remains visible.
-- Selecting files reveals a contextual extraction bar.
+- Selecting files or folders reveals a contextual extraction bar. A folder checkbox selects all recursively nested extractable file entries by unique entry ID, not pathname, and skips unsupported entries. Root-folder selection covers the archive; file-list folder checkboxes are available on mobile and tree checkboxes on desktop. The checkbox is mixed when some extractable descendants are selected and disabled when none can be extracted. Overlapping selections do not duplicate files; unchecking a folder deselects its extractable descendants. Folder-origin selections are exported as ZIP even if only one extractable file remains, preserving original relative archive paths. Empty directories are not exported.
 - File list headers sort name, size and compression ratio.

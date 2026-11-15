@@ -70,6 +70,7 @@ function harness(overrides = {}) {
   const extOf = name => name.split('.').at(-1).toLowerCase();
   const context = vm.createContext({
     state, VIRTUAL_THRESHOLD: 250,
+    syncSelectionControls: () => {},
     $: selector => {
       assert.ok(nodes[selector.slice(1)], `Unexpected DOM access: ${selector}`);
       return nodes[selector.slice(1)];

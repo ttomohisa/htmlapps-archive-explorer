@@ -18,6 +18,7 @@ const impl=[
   segment('const CRC32_TABLE','async function parseTarBytes'),
   segment('async function parseTarBytes','function isTar'),
   segment('function decodeBytes','function readVint'),
+  segment('function staleArchiveError','async function entryData'),
   segment('function u16','async function saveSelected'),
 ].join('\n');
 const api=new Function('state','setPhase','showToast','t','entryData',
@@ -109,4 +110,14 @@ test('ZIP re-export removes traversal and absolute paths and deduplicates names'
 });
 test('TAR.GZ per-entry compression is marked unavailable, not zero savings',()=>{
   assert.match(source,/for\(const entry of entries\)if\(!entry\.dir\)entry\.compressedSize=null/);
+});
+
+test('ZIP export cancels before download when a newer archive replaces its source',async()=>{
+  let resolveData;
+  const e={path:'old/file.txt',getData:()=>new Promise(resolve=>{resolveData=resolve}),modified:new Date('2026-01-01')};
+  const promise=api.buildStoredZip([e]);
+  state.generation++;
+  resolveData(enc.encode('OLD ARCHIVE'));
+  await assert.rejects(promise,{code:'STALE_ARCHIVE'});
+  state.generation--;
 });

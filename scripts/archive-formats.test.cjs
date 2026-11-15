@@ -12,6 +12,7 @@ const segment=(from,to)=>{
 };
 const state={generation:1};
 const impl=[
+  `const UTF8=new TextDecoder('utf-8');const UTF8_FATAL=new TextDecoder('utf-8',{fatal:true});const ANSI=new TextDecoder('windows-1252');`,
   segment('function cleanPath','function classify'),
   segment('function dosDate','const CRC32_TABLE'),
   segment('const CRC32_TABLE','async function parseTarBytes'),
